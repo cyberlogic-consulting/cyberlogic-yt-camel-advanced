@@ -1,0 +1,39 @@
+spring.application.name: example-document-sign
+
+camel:
+  dataformat:
+    jackson:
+      object-mapper: objectMapperWithTimeModuleSupport
+    jackson-xml:
+      xml-mapper: xmlMapperWithTimeModuleSupport
+
+sftp:
+  server:
+    host: ${DOCSEND_SFTP_HOST}
+    port: ${DOCSEND_SFTP_PORT}
+    directory: "documents"
+    user: ${DOCSEND_SFTP_USER}
+    password: ${DOCSEND_SFTP_PASSWORD}
+    known_hosts: "etc/.ssh/known_hosts"
+
+spring:
+  datasource:
+    url: "jdbc:postgresql://${DOCSEND_DB_URL}/integration"
+    driverClassName: org.postgresql.Driver
+    username: ${DOCSEND_DB_USER}
+    password: ${DOCSEND_DB_PASSWORD}
+  artemis:
+    broker-url: ${DOCSEND_ARTEMIS_URL}
+    user: ${DOCSEND_ARTEMIS_USER}
+    password: ${DOCSEND_ARTEMIS_PASSWORD}
+
+signDocument:
+  serviceUrl: ${DOCSEND_SIGNDOCUMENT_URL}
+  signType: "CAdES-C"
+  apiKey: ${DOCSEND_SIGNDOCUMENT_APIKEY}
+  trustStore: ${DOCSEND_SIGNDOCUMENT_TRUSTSTORE}
+  trustStorePassword: ${DOCSEND_SIGNDOCUMENT_TRUSTSTORE_PASSWORD}
+
+clientSend:
+  clientSendRequestQueue: ${DOCSEND_SENDDOCUMENT_QUEUE_REQUEST}
+  clientSendResponseQueue: ${DOCSEND_SENDDOCUMENT_QUEUE_RESPONSE}

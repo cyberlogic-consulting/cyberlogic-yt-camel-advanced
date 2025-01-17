@@ -1,0 +1,26 @@
+
+sftp:
+  server:
+    host: localhost
+    port: 8022
+    directory: "documents"
+    user: user
+    password: password
+    known_hosts: "src/test/resources/it/known_hosts"
+
+signDocument:
+  serviceUrl: "http://localhost:8080/SignDocument/sign"
+  signType: "CAdES-C"
+  apiKey: "acb93ac2-2dce-4209-8ef2-2188ce2047c2"
+  trustStore: "it/sign_document_service/test_truststore.jks"
+  trustStorePassword: "password"
+
+clientSend:
+  clientSendRequestQueue: "client.send.request.queue"
+  clientSendResponseQueue: "client.send.response.queue"
+
+spring:
+  autoconfigure:
+    exclude: |
+      org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,
+      org.springframework.boot.autoconfigure.jms.artemis.ArtemisAutoConfiguration
