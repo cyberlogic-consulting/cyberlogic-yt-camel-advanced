@@ -135,6 +135,11 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 				<version>${spring.boot.version}</version>
+				<configuration>
+					<image>
+						<name>cyberlogic.ch/examples/${project.artifactId}:${project.version}</name>
+					</image>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>
