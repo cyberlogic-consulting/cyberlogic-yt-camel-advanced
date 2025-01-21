@@ -33,8 +33,8 @@ public class TestConstants {
     /**
      * ClientSend Service
      */
-    public static final String SEND_DOCUMENT_REQUEST_QUEUE = "client.send.request.queue";
-    public static final String SEND_DOCUMENT_RESPONSE_QUEUE = "client.send.response.queue";
+    public static final String CLIENT_SEND_REQUEST_QUEUE = "client.send.request.queue";
+    public static final String CLIENT_SEND_RESPONSE_QUEUE = "client.send.response.queue";
     public static final String CLIENT_SEND_RESPONSE_STATUS_OK = "ClientSendRequest: Status ok";
     public static final String CLIENT_SEND_RESPONSE_MESSAGE_REGULAR = "Document sent";
     public static final LocalDateTime CLIENT_SEND_RESPONSE_TIMESTAMP_REGULAR = LocalDateTime.now();

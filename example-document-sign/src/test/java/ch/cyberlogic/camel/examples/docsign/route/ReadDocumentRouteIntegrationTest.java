@@ -2,6 +2,7 @@ package ch.cyberlogic.camel.examples.docsign.route;
 
 import ch.cyberlogic.camel.examples.docsign.configuration.SSLContextParamsConfiguration;
 import ch.cyberlogic.camel.examples.docsign.service.SignDocumentRequestMapper;
+import ch.cyberlogic.camel.examples.docsign.util.RouteTestUtil;
 import ch.cyberlogic.camel.examples.docsign.util.TestConstants;
 import ch.cyberlogic.camel.examples.docsign.util.endpoints.Endpoints;
 import java.util.Map;
@@ -87,12 +88,7 @@ public class ReadDocumentRouteIntegrationTest {
 
     @DynamicPropertySource
     static void setUpProperties(DynamicPropertyRegistry registry) {
-        registry.add("sftp.server.host", () -> "localhost");
-        registry.add("sftp.server.port", () -> sftpContainer.getMappedPort(22));
-        registry.add("sftp.server.directory", () -> TestConstants.SFTP_DIR);
-        registry.add("sftp.server.user", () -> TestConstants.USER);
-        registry.add("sftp.server.password", () -> TestConstants.PASSWORD);
-        registry.add("sftp.server.known_hosts", () -> "src/test/resources/it/known_hosts");
+        RouteTestUtil.setTestSftpServerProperties(registry, sftpContainer.getMappedPort(22));
     }
 
     @BeforeEach
@@ -171,8 +167,8 @@ public class ReadDocumentRouteIntegrationTest {
                 .send();
 
 
-        Exchange initialFileFromErrorFolderExchange =
-                consumerTemplate.receive(getSftpEndpointWithErrorDirectory(), TestConstants.TEST_TIMEOUT);
+        Exchange initialFileFromErrorFolderExchange = consumerTemplate.receive(
+                Endpoints.getSftpEndpointUriWithErrorDirectory(), TestConstants.TEST_TIMEOUT);
 
 
         mock.expectedMessageCount(0);
@@ -182,10 +178,5 @@ public class ReadDocumentRouteIntegrationTest {
         Message initialFileFromErrorFolder = initialFileFromErrorFolderExchange.getMessage();
         assertEquals(fileName, initialFileFromErrorFolder.getHeader(Exchange.FILE_NAME));
         assertEquals(contents, initialFileFromErrorFolder.getBody(String.class));
-    }
-
-    private String getSftpEndpointWithErrorDirectory() {
-        return Endpoints.sftpServer().getRawUri()
-                .replace("{{sftp.server.directory}}", "{{sftp.server.directory}}/.processing/.error");
     }
 }

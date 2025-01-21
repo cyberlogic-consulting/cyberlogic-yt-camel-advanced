@@ -13,4 +13,9 @@ public class Endpoints {
                 .knownHostsFile("{{sftp.server.known_hosts}}");
     }
 
+    public static String getSftpEndpointUriWithErrorDirectory() {
+        return Endpoints.sftpServer().getRawUri()
+                .replace("{{sftp.server.directory}}", "{{sftp.server.directory}}/.processing/.error");
+    }
+
 }

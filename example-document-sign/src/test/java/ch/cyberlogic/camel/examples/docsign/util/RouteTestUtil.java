@@ -8,6 +8,7 @@ import org.awaitility.Awaitility;
 import org.mockserver.client.MockServerClient;
 import org.mockserver.model.JsonBody;
 import org.mockserver.model.MediaType;
+import org.springframework.test.context.DynamicPropertyRegistry;
 
 import static org.mockserver.model.HttpRequest.request;
 import static org.mockserver.model.HttpResponse.response;
@@ -73,5 +74,34 @@ public class RouteTestUtil {
                 .respond(response()
                         .withStatusCode(200)
                         .withBody(response));
+    }
+
+    public static void setTestSftpServerProperties(
+            DynamicPropertyRegistry registry,
+            Integer port) {
+        registry.add("sftp.server.host", () -> "localhost");
+        registry.add("sftp.server.port", () -> port);
+        registry.add("sftp.server.directory", () -> TestConstants.SFTP_DIR);
+        registry.add("sftp.server.user", () -> TestConstants.USER);
+        registry.add("sftp.server.password", () -> TestConstants.PASSWORD);
+        registry.add("sftp.server.known_hosts", () -> "src/test/resources/it/known_hosts");
+    }
+
+    public static void setTestSignDocumentServiceProperties(
+            DynamicPropertyRegistry registry,
+            String endpoint) {
+        registry.add("signDocument.serviceUrl",
+                () -> endpoint + TestConstants.SIGN_DOCUMENT_SERVICE_PATH);
+        registry.add("signDocument.apiKey", () -> TestConstants.SIGN_DOCUMENT_API_KEY);
+        registry.add("signDocument.signType", () -> TestConstants.SIGN_DOCUMENT_SIGN_TYPE);
+        registry.add("signDocument.trustStore", () -> TestConstants.SIGN_DOCUMENT_TRUSTSTORE);
+        registry.add("signDocument.trustStorePassword", () -> TestConstants.SIGN_DOCUMENT_TRUSTSTORE_PASSWORD);
+    }
+
+    public static void setTestClientSendServiceProperties(DynamicPropertyRegistry registry) {
+        registry.add("clientSend.clientSendRequestQueue",
+                () -> TestConstants.CLIENT_SEND_REQUEST_QUEUE);
+        registry.add("clientSend.clientSendResponseQueue",
+                () -> TestConstants.CLIENT_SEND_RESPONSE_QUEUE);
     }
 }

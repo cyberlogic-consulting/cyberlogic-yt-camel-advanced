@@ -93,12 +93,9 @@ public class SignDocumentRouteIntegrationTest {
                 mockServerContainer.getServerPort()
         );
 
-        registry.add("signDocument.serviceUrl", () ->
-                mockServerContainer.getSecureEndpoint() + TestConstants.SIGN_DOCUMENT_SERVICE_PATH);
-        registry.add("signDocument.apiKey", () -> TestConstants.SIGN_DOCUMENT_API_KEY);
-        registry.add("signDocument.signType", () -> TestConstants.SIGN_DOCUMENT_SIGN_TYPE);
-        registry.add("signDocument.trustStore", () -> TestConstants.SIGN_DOCUMENT_TRUSTSTORE);
-        registry.add("signDocument.trustStorePassword", () -> TestConstants.SIGN_DOCUMENT_TRUSTSTORE_PASSWORD);
+        RouteTestUtil.setTestSignDocumentServiceProperties(
+                registry,
+                mockServerContainer.getSecureEndpoint());
     }
 
     @BeforeEach

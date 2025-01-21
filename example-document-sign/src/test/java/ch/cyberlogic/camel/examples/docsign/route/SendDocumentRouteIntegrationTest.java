@@ -95,10 +95,7 @@ public class SendDocumentRouteIntegrationTest {
 
     @DynamicPropertySource
     static void setUpProperties(DynamicPropertyRegistry registry) {
-        registry.add("clientSend.clientSendRequestQueue",
-                () -> TestConstants.SEND_DOCUMENT_REQUEST_QUEUE);
-        registry.add("clientSend.clientSendResponseQueue",
-                () -> TestConstants.SEND_DOCUMENT_RESPONSE_QUEUE);
+        RouteTestUtil.setTestClientSendServiceProperties(registry);
     }
 
     @BeforeEach
@@ -114,7 +111,7 @@ public class SendDocumentRouteIntegrationTest {
         camelContext.addRoutes(new RouteBuilder() {
             @Override
             public void configure() {
-                from("jms:" + TestConstants.SEND_DOCUMENT_REQUEST_QUEUE)
+                from("jms:" + TestConstants.CLIENT_SEND_REQUEST_QUEUE)
                         .id("MockClientSendService")
                         .log("MockClientSendService received request: ${body}; RequestHeaders: ${headers}")
                         .to(MOCK_CLIENT_SEND_SERVICE)

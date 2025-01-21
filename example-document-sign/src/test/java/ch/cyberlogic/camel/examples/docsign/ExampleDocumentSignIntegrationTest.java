@@ -2,10 +2,13 @@ package ch.cyberlogic.camel.examples.docsign;
 
 import ch.cyberlogic.camel.examples.docsign.route.SendDocumentRoute;
 import ch.cyberlogic.camel.examples.docsign.service.SignDocumentRequestMapper;
+import ch.cyberlogic.camel.examples.docsign.util.RouteTestUtil;
+import ch.cyberlogic.camel.examples.docsign.util.TestConstants;
+import ch.cyberlogic.camel.examples.docsign.util.endpoints.Endpoints;
 import org.apache.camel.ConsumerTemplate;
 import org.apache.camel.Exchange;
+import org.apache.camel.FluentProducerTemplate;
 import org.apache.camel.Message;
-import org.apache.camel.ProducerTemplate;
 import org.apache.camel.test.spring.junit5.CamelSpringBootTest;
 import org.apache.camel.test.spring.junit5.ExcludeRoutes;
 import org.junit.jupiter.api.Test;
@@ -43,33 +46,21 @@ import static org.mockito.Mockito.doThrow;
 @DirtiesContext
 public class ExampleDocumentSignIntegrationTest {
 
-    private static final int TEST_TIMEOUT = 5000;
-
-    private static final String USER = "user";
-    private static final String PASSWORD = "password";
-
-    private static final String SFTP_DIR = "documents";
-
-    private static final String DB_NAME = "integration";
-
-    private static final String SIGN_DOCUMENT_SERVICE_PATH = "/SignDocument/sign";
-    private static final String SIGN_DOCUMENT_API_KEY = "acb93ac2-2dce-4209-8ef2-2188ce2047c2";
-    private static final String SIGN_DOCUMENT_SIGN_TYPE = "CAdES-C";
-    private static final String SIGN_DOCUMENT_TRUSTSTORE_PASSWORD = "password";
-    private static final String SIGN_DOCUMENT_TRUSTSTORE = "it/sign_document_service/test_truststore.jks";
-
     static MockServerClient mockServerClient;
 
-    static GenericContainer<?> sftpContainer = getConfiguredSftpContainer(USER, PASSWORD, SFTP_DIR);
+    static GenericContainer<?> sftpContainer = getConfiguredSftpContainer(
+            TestConstants.USER,
+            TestConstants.PASSWORD,
+            TestConstants.SFTP_DIR);
 
     @ServiceConnection
     static ArtemisContainer artemisContainer = getConfiguredArtemisContainer();
 
     @ServiceConnection
     static PostgreSQLContainer<?> postgreSQLContainer = getConfiguredPostgreSQLContainer(
-            USER,
-            PASSWORD,
-            DB_NAME
+            TestConstants.USER,
+            TestConstants.PASSWORD,
+            TestConstants.DB_NAME
     );
 
     static MockServerContainer mockServerContainer = getConfiguredMockServerContainer();
@@ -78,7 +69,7 @@ public class ExampleDocumentSignIntegrationTest {
     private SignDocumentRequestMapper signDocumentRequestMapper;
 
     @Autowired
-    private ProducerTemplate producerTemplate;
+    private FluentProducerTemplate producerTemplate;
 
     @Autowired
     private ConsumerTemplate consumerTemplate;
@@ -90,19 +81,10 @@ public class ExampleDocumentSignIntegrationTest {
                 mockServerContainer.getHost(),
                 mockServerContainer.getServerPort()
         );
-
-        registry.add("signDocument.serviceUrl", () -> mockServerContainer.getSecureEndpoint() + SIGN_DOCUMENT_SERVICE_PATH);
-        registry.add("signDocument.apiKey", () -> SIGN_DOCUMENT_API_KEY);
-        registry.add("signDocument.signType", () -> SIGN_DOCUMENT_SIGN_TYPE);
-        registry.add("signDocument.trustStore", () -> SIGN_DOCUMENT_TRUSTSTORE);
-        registry.add("signDocument.trustStorePassword", () -> SIGN_DOCUMENT_TRUSTSTORE_PASSWORD);
-
-        registry.add("sftp.server.host", () -> "localhost");
-        registry.add("sftp.server.port", () -> sftpContainer.getMappedPort(22));
-        registry.add("sftp.server.directory", () -> SFTP_DIR);
-        registry.add("sftp.server.user", () -> USER);
-        registry.add("sftp.server.password", () -> PASSWORD);
-        registry.add("sftp.server.known_hosts", () -> "src/test/resources/it/known_hosts");
+        RouteTestUtil.setTestSignDocumentServiceProperties(
+                registry,
+                mockServerContainer.getSecureEndpoint());
+        RouteTestUtil.setTestSftpServerProperties(registry, sftpContainer.getMappedPort(22));
     }
 
     @Test
@@ -121,18 +103,15 @@ public class ExampleDocumentSignIntegrationTest {
                 + "_" + ownerId
                 + "_" + documentType
                 + "_" + clientId + ".pdf";
-        doThrow(new RuntimeException("ABOBA")).when(signDocumentRequestMapper).prepareSignDocumentRequest(any());
+        doThrow(new RuntimeException("Exception happened in the 2nd route")).when(signDocumentRequestMapper).prepareSignDocumentRequest(any());
 
-        producerTemplate.sendBodyAndHeader("sftp://{{sftp.server.host}}:{{sftp.server.port}}/{{sftp.server.directory}}" +
-                        "?username={{sftp.server.user}}&password={{sftp.server.password}}" +
-                        "&knownHostsFile={{sftp.server.known_hosts}}",
-                contents,
-                Exchange.FILE_NAME,
-                fileName);
+        producerTemplate
+                .withBody(contents)
+                .withHeader(Exchange.FILE_NAME, fileName)
+                .to(Endpoints.sftpServer())
+                .send();
         Exchange initialFileFromErrorFolderExchange = consumerTemplate.receive(
-                "sftp://{{sftp.server.host}}:{{sftp.server.port}}/{{sftp.server.directory}}/.processing/.error" +
-                        "?username={{sftp.server.user}}&password={{sftp.server.password}}" +
-                        "&knownHostsFile={{sftp.server.known_hosts}}", TEST_TIMEOUT);
+                Endpoints.getSftpEndpointUriWithErrorDirectory(), TestConstants.TEST_TIMEOUT);
 
         assertNotNull(initialFileFromErrorFolderExchange);
         Message initialFileFromErrorFolder = initialFileFromErrorFolderExchange.getMessage();
