@@ -1,6 +1,6 @@
 package ch.cyberlogic.camel.examples.docsign.route;
 
-import ch.cyberlogic.camel.examples.docsign.service.ExchangeTransformer;
+import ch.cyberlogic.camel.examples.docsign.service.FileMetadataExtractor;
 import javax.sql.DataSource;
 import org.apache.camel.CamelContext;
 import org.apache.camel.EndpointInject;
@@ -42,7 +42,7 @@ public class ReadDocumentRouteTest {
     private ProducerTemplate producerTemplate;
 
     @MockitoBean
-    private ExchangeTransformer exchangeTransformer;
+    private FileMetadataExtractor fileMetadataExtractor;
 
     @MockitoBean
     DataSource dataSource;
@@ -94,7 +94,7 @@ public class ReadDocumentRouteTest {
                 fileName
         );
 
-        verify(exchangeTransformer, times(1)).extractFileMetadata(any());
+        verify(fileMetadataExtractor, times(1)).extractFileMetadata(any());
         mockSql.expectedMessageCount(1);
         mockSql.expectedHeaderReceived(SqlConstants.SQL_RETRIEVE_GENERATED_KEYS, true);
         mockSignDocument.expectedMessageCount(1);

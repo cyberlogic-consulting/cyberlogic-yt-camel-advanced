@@ -3,7 +3,8 @@ package ch.cyberlogic.camel.examples.docsign.route;
 import ch.cyberlogic.camel.examples.docsign.model.ClientSendRequest;
 import ch.cyberlogic.camel.examples.docsign.model.ClientSendResponse;
 import ch.cyberlogic.camel.examples.docsign.model.SignDocumentResponse;
-import ch.cyberlogic.camel.examples.docsign.service.ExchangeTransformer;
+import ch.cyberlogic.camel.examples.docsign.service.ClientSendRequestMapper;
+import ch.cyberlogic.camel.examples.docsign.util.RouteTestUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
@@ -55,7 +56,7 @@ public class SendDocumentRouteTest {
     private ProducerTemplate producerTemplate;
 
     @MockitoBean
-    private ExchangeTransformer exchangeTransformer;
+    private ClientSendRequestMapper exchangeTransformer;
 
     @MockitoBean
     DataSource dataSource;
@@ -98,13 +99,10 @@ public class SendDocumentRouteTest {
                         .skipSendToOriginalEndpoint()
                         .to(MOCK_JMS_SEND_SERVICE)
         );
-        AdviceWith.adviceWith(
+        RouteTestUtil.addEndpointOnRouteCompletion(
                 camelContext,
                 SendDocumentRoute.ROUTE_ID,
-                route -> route
-                        .onCompletion()
-                        .to(MOCK_ROUTE_FINISHED)
-        );
+                MOCK_ROUTE_FINISHED);
     }
 
     @Test

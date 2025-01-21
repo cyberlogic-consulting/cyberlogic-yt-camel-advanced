@@ -1,13 +1,16 @@
 package ch.cyberlogic.camel.examples.docsign.route;
 
-import ch.cyberlogic.camel.examples.docsign.service.ExchangeTransformer;
+import ch.cyberlogic.camel.examples.docsign.configuration.SSLContextParamsConfiguration;
+import ch.cyberlogic.camel.examples.docsign.service.SignDocumentRequestMapper;
+import ch.cyberlogic.camel.examples.docsign.util.TestConstants;
+import ch.cyberlogic.camel.examples.docsign.util.endpoints.Endpoints;
 import java.util.Map;
 import org.apache.camel.CamelContext;
 import org.apache.camel.ConsumerTemplate;
 import org.apache.camel.EndpointInject;
 import org.apache.camel.Exchange;
+import org.apache.camel.FluentProducerTemplate;
 import org.apache.camel.Message;
-import org.apache.camel.ProducerTemplate;
 import org.apache.camel.builder.AdviceWith;
 import org.apache.camel.component.mock.MockEndpoint;
 import org.apache.camel.test.spring.junit5.CamelSpringBootTest;
@@ -22,12 +25,20 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.EnabledIf;
 import org.testcontainers.activemq.ArtemisContainer;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.utility.MountableFile;
 
+import static ch.cyberlogic.camel.examples.docsign.service.FileMetadataExtractor.CLIENT_ID;
+import static ch.cyberlogic.camel.examples.docsign.service.FileMetadataExtractor.DOCUMENT_ID;
+import static ch.cyberlogic.camel.examples.docsign.service.FileMetadataExtractor.DOCUMENT_TYPE;
+import static ch.cyberlogic.camel.examples.docsign.service.FileMetadataExtractor.OWNER_ID;
+import static ch.cyberlogic.camel.examples.docsign.util.RouteTestUtil.awaitUntilLogAppearsInDBWithDocumentId;
+import static ch.cyberlogic.camel.examples.docsign.util.containers.TestContainersConfigurations.getConfiguredArtemisContainer;
+import static ch.cyberlogic.camel.examples.docsign.util.containers.TestContainersConfigurations.getConfiguredPostgreSQLContainer;
+import static ch.cyberlogic.camel.examples.docsign.util.containers.TestContainersConfigurations.getConfiguredSftpContainer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -40,38 +51,30 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @DirtiesContext
 public class ReadDocumentRouteIntegrationTest {
 
-    private static final int TEST_TIMEOUT = 5000;
-
-    private static final String USER = "user";
-    private static final String PASSWORD = "password";
-
-    private static final String SFTP_DIR = "documents";
-
-    private static final String DB_NAME = "integration";
-
-
-    static GenericContainer<?> sftpContainer = new GenericContainer<>("atmoz/sftp:alpine")
-            .withCopyFileToContainer(
-                    MountableFile.forClasspathResource("it/ssh_host_ed25519_key", 0777),
-                    "/etc/ssh/ssh_host_ed25519_key"
-            )
-            .withExposedPorts(22)
-            .withCommand(USER + ":" + PASSWORD + ":::" + SFTP_DIR);
-
-    @ServiceConnection
-    static PostgreSQLContainer<?> postgreSQLContainer = new PostgreSQLContainer<>("postgres:17.2-alpine")
-            .withDatabaseName(DB_NAME)
-            .withUsername(USER)
-            .withPassword(PASSWORD)
-            .withInitScript("it/db/init.sql");
-
-    @ServiceConnection
-    static ArtemisContainer artemisContainer = new ArtemisContainer("apache/activemq-artemis:2.39.0-alpine");
-
     private static final String MOCK_SIGN_DOCUMENT = "mock:" + SignDocumentRoute.INPUT_ENDPOINT;
 
+    static GenericContainer<?> sftpContainer = getConfiguredSftpContainer(
+            TestConstants.USER,
+            TestConstants.PASSWORD,
+            TestConstants.SFTP_DIR);
+
+    @ServiceConnection
+    static PostgreSQLContainer<?> postgreSQLContainer = getConfiguredPostgreSQLContainer(
+            TestConstants.USER,
+            TestConstants.PASSWORD,
+            TestConstants.DB_NAME);
+
+    @ServiceConnection
+    static ArtemisContainer artemisContainer = getConfiguredArtemisContainer();
+
+    @MockitoBean
+    private SSLContextParamsConfiguration excludedSSLContextParamsConfiguration;
+
+    @MockitoBean
+    private SignDocumentRequestMapper excludedSignDocumentRequestMapper;
+
     @Autowired
-    private ProducerTemplate producerTemplate;
+    private FluentProducerTemplate producerTemplate;
 
     @Autowired
     private ConsumerTemplate consumerTemplate;
@@ -86,9 +89,10 @@ public class ReadDocumentRouteIntegrationTest {
     static void setUpProperties(DynamicPropertyRegistry registry) {
         registry.add("sftp.server.host", () -> "localhost");
         registry.add("sftp.server.port", () -> sftpContainer.getMappedPort(22));
-        registry.add("sftp.server.directory", () -> SFTP_DIR);
-        registry.add("sftp.server.user", () -> USER);
-        registry.add("sftp.server.password", () -> PASSWORD);
+        registry.add("sftp.server.directory", () -> TestConstants.SFTP_DIR);
+        registry.add("sftp.server.user", () -> TestConstants.USER);
+        registry.add("sftp.server.password", () -> TestConstants.PASSWORD);
+        registry.add("sftp.server.known_hosts", () -> "src/test/resources/it/known_hosts");
     }
 
     @BeforeEach
@@ -115,35 +119,38 @@ public class ReadDocumentRouteIntegrationTest {
                 + "_" + ownerId
                 + "_" + documentType
                 + "_" + clientId + ".pdf";
+        String status = "Read document";
 
-        producerTemplate.sendBodyAndHeader("sftp://{{sftp.server.host}}:{{sftp.server.port}}/{{sftp.server.directory}}" +
-                        "?username={{sftp.server.user}}&password={{sftp.server.password}}" +
-                        "&knownHostsFile={{sftp.server.known_hosts}}",
-                contents,
-                Exchange.FILE_NAME,
-                fileName);
+        producerTemplate
+                .withBody(contents)
+                .withHeader(Exchange.FILE_NAME, fileName)
+                .to(Endpoints.sftpServer())
+                .send();
+        awaitUntilLogAppearsInDBWithDocumentId(
+                consumerTemplate,
+                Integer.valueOf(documentId),
+                TestConstants.TEST_TIMEOUT);
         Map dbResult = consumerTemplate.receive(
                         "sql:select * from document_sign_log " +
                                 "where document_number = ' " + documentId + "'",
-                                TEST_TIMEOUT)
+                        TestConstants.TEST_TIMEOUT)
                 .getMessage().getBody(Map.class);
-
 
         mock.expectedMessageCount(1);
         mock.expectedBodiesReceived(contents);
         mock.expectedHeaderReceived(Exchange.FILE_NAME, fileName);
-        mock.expectedHeaderReceived(ExchangeTransformer.DOCUMENT_ID, documentId);
-        mock.expectedHeaderReceived(ExchangeTransformer.OWNER_ID, ownerId);
-        mock.expectedHeaderReceived(ExchangeTransformer.DOCUMENT_TYPE, documentType);
-        mock.expectedHeaderReceived(ExchangeTransformer.CLIENT_ID, clientId);
+        mock.expectedHeaderReceived(DOCUMENT_ID, documentId);
+        mock.expectedHeaderReceived(OWNER_ID, ownerId);
+        mock.expectedHeaderReceived(DOCUMENT_TYPE, documentType);
+        mock.expectedHeaderReceived(CLIENT_ID, clientId);
         mock.expectedMessagesMatches(
                 exchange -> exchange.getMessage().getHeader(ReadDocumentRoute.DATABASE_LOG_ID) != null);
 
-        mock.assertIsSatisfied(TEST_TIMEOUT);
+        mock.assertIsSatisfied(TestConstants.TEST_TIMEOUT);
 
         assertEquals(documentId, dbResult.get("document_number").toString());
         assertEquals(ownerId, dbResult.get("owner"));
-        assertEquals("Read document", dbResult.get("status"));
+        assertEquals(status, dbResult.get("status"));
         assertNotNull(dbResult.get("last_update"));
     }
 
@@ -157,17 +164,15 @@ public class ReadDocumentRouteIntegrationTest {
                 + "_" + documentType
                 + "_" + clientId + ".pdf";
 
-        producerTemplate.sendBodyAndHeader("sftp://{{sftp.server.host}}:{{sftp.server.port}}/{{sftp.server.directory}}" +
-                        "?username={{sftp.server.user}}&password={{sftp.server.password}}" +
-                        "&knownHostsFile={{sftp.server.known_hosts}}",
-                contents,
-                Exchange.FILE_NAME,
-                fileName);
-        Exchange initialFileFromErrorFolderExchange = consumerTemplate.receive(
-                        "sftp://{{sftp.server.host}}:{{sftp.server.port}}/{{sftp.server.directory}}/.processing/.error" +
-                                "?username={{sftp.server.user}}&password={{sftp.server.password}}" +
-                                "&knownHostsFile={{sftp.server.known_hosts}}", TEST_TIMEOUT);
+        producerTemplate
+                .withBody(contents)
+                .withHeader(Exchange.FILE_NAME, fileName)
+                .to(Endpoints.sftpServer())
+                .send();
 
+
+        Exchange initialFileFromErrorFolderExchange =
+                consumerTemplate.receive(getSftpEndpointWithErrorDirectory(), TestConstants.TEST_TIMEOUT);
 
 
         mock.expectedMessageCount(0);
@@ -177,5 +182,10 @@ public class ReadDocumentRouteIntegrationTest {
         Message initialFileFromErrorFolder = initialFileFromErrorFolderExchange.getMessage();
         assertEquals(fileName, initialFileFromErrorFolder.getHeader(Exchange.FILE_NAME));
         assertEquals(contents, initialFileFromErrorFolder.getBody(String.class));
+    }
+
+    private String getSftpEndpointWithErrorDirectory() {
+        return Endpoints.sftpServer().getRawUri()
+                .replace("{{sftp.server.directory}}", "{{sftp.server.directory}}/.processing/.error");
     }
 }

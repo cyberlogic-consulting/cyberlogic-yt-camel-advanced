@@ -1,7 +1,7 @@
 package ch.cyberlogic.camel.examples.docsign.route;
 
 import ch.cyberlogic.camel.examples.docsign.model.ClientSendResponse;
-import ch.cyberlogic.camel.examples.docsign.service.ExchangeTransformer;
+import ch.cyberlogic.camel.examples.docsign.service.FileMetadataExtractor;
 import org.apache.camel.Exchange;
 import org.apache.camel.ExchangePattern;
 import org.apache.camel.builder.RouteBuilder;
@@ -20,8 +20,8 @@ public class SendDocumentRoute extends RouteBuilder {
     public void configure() throws Exception {
         from(INPUT_ENDPOINT)
                 .routeId(ROUTE_ID)
-                .bean("exchangeTransformer", "prepareClientSendRequest")
-                .log("Sending signed document to client: ${header." + ExchangeTransformer.CLIENT_ID + "}")
+                .bean("clientSendRequestMapper", "prepareClientSendRequest")
+                .log("Sending signed document to client: ${header." + FileMetadataExtractor.CLIENT_ID + "}")
                 .marshal().jacksonXml()
                 .to(ExchangePattern.InOut,
                         jms("{{clientSend.clientSendRequestQueue}}")

@@ -26,7 +26,7 @@ public class ReadDocumentRoute extends RouteBuilder {
                     .move(".done"))
                 .routeId(ROUTE_ID)
                 .log("Read document: ${header." + Exchange.FILE_NAME + "}")
-                .bean("exchangeTransformer", "extractFileMetadata")
+                .bean("fileMetadataExtractor", "extractFileMetadata")
                 .setHeader(SqlConstants.SQL_RETRIEVE_GENERATED_KEYS, constant(true))
                 .to(sql(
                         "insert into document_sign_log (document_number, owner, last_update, status) " +

@@ -2,11 +2,10 @@ package ch.cyberlogic.camel.examples.docsign.route;
 
 import ch.cyberlogic.camel.examples.docsign.model.SignDocumentRequest;
 import ch.cyberlogic.camel.examples.docsign.model.SignDocumentResponse;
-import ch.cyberlogic.camel.examples.docsign.service.ExchangeTransformer;
+import ch.cyberlogic.camel.examples.docsign.service.SignDocumentRequestMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.time.LocalDateTime;
 import java.util.Base64;
 import java.util.List;
@@ -22,6 +21,7 @@ import org.apache.camel.test.spring.junit5.ExcludeRoutes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
@@ -48,11 +48,15 @@ public class SignDocumentRouteTest {
     @Autowired
     private CamelContext camelContext;
 
+    @Autowired
+    @Qualifier("objectMapperWithTimeModuleSupport")
+    private ObjectMapper objectMapper;
+
     @Produce(DIRECT_START)
     private ProducerTemplate producerTemplate;
 
     @MockitoBean
-    private ExchangeTransformer exchangeTransformer;
+    private SignDocumentRequestMapper signDocumentRequestMapper;
 
     @MockitoBean
     DataSource dataSource;
@@ -121,8 +125,6 @@ public class SignDocumentRouteTest {
                 apiKey,
                 documentType
         );
-        ObjectMapper objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
         ObjectWriter writer = objectMapper.writer();
         byte[] expectedSerializedRequest = writer.writeValueAsBytes(expectedRequest);
         String status = "Status ok";
@@ -137,7 +139,7 @@ public class SignDocumentRouteTest {
 
         camelContext.createProducerTemplate().sendBody(DIRECT_START, expectedRequest);
 
-        verify(exchangeTransformer, times(1)).prepareSignDocumentRequest(any());
+        verify(signDocumentRequestMapper, times(1)).prepareSignDocumentRequest(any());
 
         mockHttpSignService.expectedMessageCount(1);
         mockHttpSignService.expectedBodiesReceived(List.of(expectedSerializedRequest));

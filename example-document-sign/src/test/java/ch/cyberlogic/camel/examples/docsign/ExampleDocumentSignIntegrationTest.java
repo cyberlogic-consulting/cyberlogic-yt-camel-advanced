@@ -1,7 +1,7 @@
 package ch.cyberlogic.camel.examples.docsign;
 
 import ch.cyberlogic.camel.examples.docsign.route.SendDocumentRoute;
-import ch.cyberlogic.camel.examples.docsign.service.ExchangeTransformer;
+import ch.cyberlogic.camel.examples.docsign.service.SignDocumentRequestMapper;
 import org.apache.camel.ConsumerTemplate;
 import org.apache.camel.Exchange;
 import org.apache.camel.Message;
@@ -24,13 +24,14 @@ import org.testcontainers.activemq.ArtemisContainer;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.MockServerContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.utility.DockerImageName;
-import org.testcontainers.utility.MountableFile;
 
+import static ch.cyberlogic.camel.examples.docsign.util.containers.TestContainersConfigurations.getConfiguredArtemisContainer;
+import static ch.cyberlogic.camel.examples.docsign.util.containers.TestContainersConfigurations.getConfiguredMockServerContainer;
+import static ch.cyberlogic.camel.examples.docsign.util.containers.TestContainersConfigurations.getConfiguredPostgreSQLContainer;
+import static ch.cyberlogic.camel.examples.docsign.util.containers.TestContainersConfigurations.getConfiguredSftpContainer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doThrow;
 
 @EnabledIf("${test.integration.enabled:false}")
@@ -59,47 +60,22 @@ public class ExampleDocumentSignIntegrationTest {
 
     static MockServerClient mockServerClient;
 
-
-    static GenericContainer<?> sftpContainer = new GenericContainer<>("atmoz/sftp:alpine")
-            .withCopyFileToContainer(
-                    MountableFile.forClasspathResource("it/ssh_host_ed25519_key", 0777),
-                    "/etc/ssh/ssh_host_ed25519_key"
-            )
-            .withExposedPorts(22)
-            .withCommand(USER + ":" + PASSWORD + ":::" + SFTP_DIR);
+    static GenericContainer<?> sftpContainer = getConfiguredSftpContainer(USER, PASSWORD, SFTP_DIR);
 
     @ServiceConnection
-    static ArtemisContainer artemisContainer = new ArtemisContainer("apache/activemq-artemis:2.39.0-alpine");
+    static ArtemisContainer artemisContainer = getConfiguredArtemisContainer();
 
     @ServiceConnection
-    static PostgreSQLContainer<?> postgreSQLContainer = new PostgreSQLContainer<>("postgres:17.2-alpine")
-            .withDatabaseName(DB_NAME)
-            .withUsername(USER)
-            .withPassword(PASSWORD)
-            .withInitScript("it/db/init.sql");
+    static PostgreSQLContainer<?> postgreSQLContainer = getConfiguredPostgreSQLContainer(
+            USER,
+            PASSWORD,
+            DB_NAME
+    );
 
-    static MockServerContainer mockServerContainer =
-            new MockServerContainer(DockerImageName.parse("mockserver/mockserver:5.15.0"))
-                    .withEnv("MOCKSERVER_TLS_PRIVATE_KEY_PATH", "/config/ssl/mockserver_private_key_pk8.pem")
-                    .withEnv("MOCKSERVER_TLS_X509_CERTIFICATE_PATH", "/config/ssl/mockserver_cert_chain.pem")
-                    .withEnv("MOCKSERVER_CERTIFICATE_AUTHORITY_PRIVATE_KEY", "/config/ssl/rootCA_private_key_pk8.pem")
-                    .withEnv("MOCKSERVER_CERTIFICATE_AUTHORITY_X509_CERTIFICATE", "/config/ssl/rootCA_cert_chain.pem")
-                    .withCopyFileToContainer(
-                            MountableFile.forClasspathResource("it/sign_document_service/mockserver_private_key_pk8.pem", 0777),
-                            "/config/ssl/mockserver_private_key_pk8.pem"
-                    ).withCopyFileToContainer(
-                            MountableFile.forClasspathResource("it/sign_document_service/mockserver_cert_chain.pem", 0777),
-                            "/config/ssl/mockserver_cert_chain.pem"
-                    ).withCopyFileToContainer(
-                            MountableFile.forClasspathResource("it/sign_document_service/rootCA_private_key_pk8.pem", 0777),
-                            "/config/ssl/rootCA_private_key_pk8.pem"
-                    ).withCopyFileToContainer(
-                            MountableFile.forClasspathResource("it/sign_document_service/rootCA_cert_chain.pem", 0777),
-                            "/config/ssl/rootCA_cert_chain.pem"
-                    );
+    static MockServerContainer mockServerContainer = getConfiguredMockServerContainer();
 
     @MockitoBean
-    private ExchangeTransformer exchangeTransformer;
+    private SignDocumentRequestMapper signDocumentRequestMapper;
 
     @Autowired
     private ProducerTemplate producerTemplate;
@@ -126,6 +102,7 @@ public class ExampleDocumentSignIntegrationTest {
         registry.add("sftp.server.directory", () -> SFTP_DIR);
         registry.add("sftp.server.user", () -> USER);
         registry.add("sftp.server.password", () -> PASSWORD);
+        registry.add("sftp.server.known_hosts", () -> "src/test/resources/it/known_hosts");
     }
 
     @Test
@@ -144,12 +121,11 @@ public class ExampleDocumentSignIntegrationTest {
                 + "_" + ownerId
                 + "_" + documentType
                 + "_" + clientId + ".pdf";
-        doCallRealMethod().when(exchangeTransformer).extractFileMetadata(any());
-        doThrow(new RuntimeException("ABOBA")).when(exchangeTransformer).prepareSignDocumentRequest(any());
+        doThrow(new RuntimeException("ABOBA")).when(signDocumentRequestMapper).prepareSignDocumentRequest(any());
 
         producerTemplate.sendBodyAndHeader("sftp://{{sftp.server.host}}:{{sftp.server.port}}/{{sftp.server.directory}}" +
-                "?username={{sftp.server.user}}&password={{sftp.server.password}}" +
-                "&knownHostsFile={{sftp.server.known_hosts}}",
+                        "?username={{sftp.server.user}}&password={{sftp.server.password}}" +
+                        "&knownHostsFile={{sftp.server.known_hosts}}",
                 contents,
                 Exchange.FILE_NAME,
                 fileName);

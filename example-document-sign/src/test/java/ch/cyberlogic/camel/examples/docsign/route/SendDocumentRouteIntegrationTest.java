@@ -1,9 +1,12 @@
 package ch.cyberlogic.camel.examples.docsign.route;
 
+import ch.cyberlogic.camel.examples.docsign.configuration.SSLContextParamsConfiguration;
 import ch.cyberlogic.camel.examples.docsign.model.ClientSendRequest;
 import ch.cyberlogic.camel.examples.docsign.model.ClientSendResponse;
 import ch.cyberlogic.camel.examples.docsign.model.SignDocumentResponse;
-import ch.cyberlogic.camel.examples.docsign.service.ExchangeTransformer;
+import ch.cyberlogic.camel.examples.docsign.service.SignDocumentRequestMapper;
+import ch.cyberlogic.camel.examples.docsign.util.RouteTestUtil;
+import ch.cyberlogic.camel.examples.docsign.util.TestConstants;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import java.time.LocalDateTime;
@@ -15,7 +18,6 @@ import org.apache.camel.ConsumerTemplate;
 import org.apache.camel.EndpointInject;
 import org.apache.camel.ExchangePattern;
 import org.apache.camel.ProducerTemplate;
-import org.apache.camel.builder.AdviceWith;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.mock.MockEndpoint;
 import org.apache.camel.test.spring.junit5.CamelSpringBootTest;
@@ -30,11 +32,17 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.EnabledIf;
 import org.testcontainers.activemq.ArtemisContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 
-import static ch.cyberlogic.camel.examples.docsign.route.RouteTestUtil.awaitUntilLogAppearsInDBWithStatus;
+import static ch.cyberlogic.camel.examples.docsign.service.FileMetadataExtractor.CLIENT_ID;
+import static ch.cyberlogic.camel.examples.docsign.service.FileMetadataExtractor.DOCUMENT_ID;
+import static ch.cyberlogic.camel.examples.docsign.service.FileMetadataExtractor.OWNER_ID;
+import static ch.cyberlogic.camel.examples.docsign.util.RouteTestUtil.awaitUntilLogAppearsInDBWithStatus;
+import static ch.cyberlogic.camel.examples.docsign.util.containers.TestContainersConfigurations.getConfiguredArtemisContainer;
+import static ch.cyberlogic.camel.examples.docsign.util.containers.TestContainersConfigurations.getConfiguredPostgreSQLContainer;
 import static org.apache.camel.component.jms.JmsConstants.JMS_HEADER_REPLY_TO;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -48,31 +56,24 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 @DirtiesContext
 public class SendDocumentRouteIntegrationTest {
 
-    private static final Long TEST_TIMEOUT = 5000L;
-
-    private static final String USER = "user";
-    private static final String PASSWORD = "password";
-    private static final String DB_NAME = "integration";
-    private static final String SEND_DOCUMENT_REQUEST_QUEUE = "client.send.request.queue";
-    private static final String SEND_DOCUMENT_RESPONSE_QUEUE = "client.send.response.queue";
-
-    private static final String CLIENT_SEND_RESPONSE_STATUS = "ClientSendRequest: Status ok";
-    private static final String CLIENT_SEND_RESPONSE_MESSAGE = "Document sent";
-    private static final LocalDateTime CLIENT_SEND_RESPONSE_TIMESTAMP = LocalDateTime.now();
-
-    @ServiceConnection
-    static ArtemisContainer artemisContainer = new ArtemisContainer("apache/activemq-artemis:2.39.0-alpine");
-
-    @ServiceConnection
-    static PostgreSQLContainer<?> postgreSQLContainer = new PostgreSQLContainer<>("postgres:17.2-alpine")
-            .withDatabaseName(DB_NAME)
-            .withUsername(USER)
-            .withPassword(PASSWORD)
-            .withInitScripts(List.of("it/db/init.sql", "it/db/add-row.sql"));
-
     private static final String MOCK_ROUTE_FINISHED = "mock:send-document-finished";
-
     private static final String MOCK_CLIENT_SEND_SERVICE = "mock:client-send-service";
+
+    @ServiceConnection
+    static ArtemisContainer artemisContainer = getConfiguredArtemisContainer();
+
+    @ServiceConnection
+    static PostgreSQLContainer<?> postgreSQLContainer = getConfiguredPostgreSQLContainer(
+            TestConstants.USER,
+            TestConstants.PASSWORD,
+            TestConstants.DB_NAME,
+            List.of("it/db/add-row.sql"));
+
+    @MockitoBean
+    private SSLContextParamsConfiguration excludedSSLContextParamsConfiguration;
+
+    @MockitoBean
+    private SignDocumentRequestMapper excludedSignDocumentRequestMapper;
 
     @Autowired
     private ProducerTemplate producerTemplate;
@@ -94,8 +95,10 @@ public class SendDocumentRouteIntegrationTest {
 
     @DynamicPropertySource
     static void setUpProperties(DynamicPropertyRegistry registry) {
-        registry.add("clientSend.clientSendRequestQueue", () -> SEND_DOCUMENT_REQUEST_QUEUE);
-        registry.add("clientSend.clientSendResponseQueue", () -> SEND_DOCUMENT_RESPONSE_QUEUE);
+        registry.add("clientSend.clientSendRequestQueue",
+                () -> TestConstants.SEND_DOCUMENT_REQUEST_QUEUE);
+        registry.add("clientSend.clientSendResponseQueue",
+                () -> TestConstants.SEND_DOCUMENT_RESPONSE_QUEUE);
     }
 
     @BeforeEach
@@ -103,25 +106,22 @@ public class SendDocumentRouteIntegrationTest {
         mockRouteFinished.reset();
         mockClientSendService.reset();
 
-        AdviceWith.adviceWith(
+        RouteTestUtil.addEndpointOnRouteCompletion(
                 camelContext,
                 SendDocumentRoute.ROUTE_ID,
-                route -> route
-                        .onCompletion()
-                        .to(MOCK_ROUTE_FINISHED)
-        );
+                MOCK_ROUTE_FINISHED);
 
         camelContext.addRoutes(new RouteBuilder() {
             @Override
             public void configure() {
-                from("jms:" + SEND_DOCUMENT_REQUEST_QUEUE)
+                from("jms:" + TestConstants.SEND_DOCUMENT_REQUEST_QUEUE)
                         .id("MockClientSendService")
                         .log("MockClientSendService received request: ${body}; RequestHeaders: ${headers}")
                         .to(MOCK_CLIENT_SEND_SERVICE)
                         .setBody((exchange -> new ClientSendResponse(
-                                CLIENT_SEND_RESPONSE_STATUS,
-                                CLIENT_SEND_RESPONSE_MESSAGE,
-                                CLIENT_SEND_RESPONSE_TIMESTAMP
+                                TestConstants.CLIENT_SEND_RESPONSE_STATUS_OK,
+                                TestConstants.CLIENT_SEND_RESPONSE_MESSAGE_REGULAR,
+                                TestConstants.CLIENT_SEND_RESPONSE_TIMESTAMP_REGULAR
                         )))
                         .marshal().jacksonXml()
                         .toD()
@@ -154,38 +154,42 @@ public class SendDocumentRouteIntegrationTest {
         ObjectWriter writer = xmlMapper.writer();
         String expectedSerializedRequest = writer.writeValueAsString(expectedRequest);
         ClientSendResponse expectedResponse = new ClientSendResponse(
-                CLIENT_SEND_RESPONSE_STATUS,
-                CLIENT_SEND_RESPONSE_MESSAGE,
-                CLIENT_SEND_RESPONSE_TIMESTAMP
+                TestConstants.CLIENT_SEND_RESPONSE_STATUS_OK,
+                TestConstants.CLIENT_SEND_RESPONSE_MESSAGE_REGULAR,
+                TestConstants.CLIENT_SEND_RESPONSE_TIMESTAMP_REGULAR
         );
 
         producerTemplate.sendBodyAndHeaders(
                 SendDocumentRoute.INPUT_ENDPOINT,
                 signDocumentResponse,
                 Map.of(
-                        ExchangeTransformer.DOCUMENT_ID, documentId,
-                        ExchangeTransformer.OWNER_ID, ownerId,
-                        ExchangeTransformer.CLIENT_ID, clientId,
+                        DOCUMENT_ID, documentId,
+                        OWNER_ID, ownerId,
+                        CLIENT_ID, clientId,
                         ReadDocumentRoute.DATABASE_LOG_ID, 1
                 ));
-        awaitUntilLogAppearsInDBWithStatus(consumerTemplate, 1L, CLIENT_SEND_RESPONSE_STATUS, TEST_TIMEOUT);
+        awaitUntilLogAppearsInDBWithStatus(
+                consumerTemplate,
+                1L,
+                TestConstants.CLIENT_SEND_RESPONSE_STATUS_OK,
+                TestConstants.TEST_TIMEOUT);
 
         Map dbResult = consumerTemplate.receive(
                         "sql:select * from document_sign_log where id = 1",
-                        TEST_TIMEOUT)
+                        TestConstants.TEST_TIMEOUT)
                 .getMessage().getBody(Map.class);
 
         mockClientSendService.expectedMessageCount(1);
         mockClientSendService.expectedBodiesReceived(expectedSerializedRequest);
-        mockClientSendService.assertIsSatisfied(TEST_TIMEOUT);
+        mockClientSendService.assertIsSatisfied(TestConstants.TEST_TIMEOUT);
 
         mockRouteFinished.expectedMessageCount(1);
         mockRouteFinished.expectedBodiesReceived(expectedResponse);
-        mockRouteFinished.assertIsSatisfied(TEST_TIMEOUT);
+        mockRouteFinished.assertIsSatisfied(TestConstants.TEST_TIMEOUT);
 
         assertEquals(32767, dbResult.get("document_number"));
         assertEquals(ownerId, dbResult.get("owner"));
-        assertEquals(CLIENT_SEND_RESPONSE_STATUS, dbResult.get("status"));
+        assertEquals(TestConstants.CLIENT_SEND_RESPONSE_STATUS_OK, dbResult.get("status"));
         assertNotNull(dbResult.get("last_update"));
     }
 }

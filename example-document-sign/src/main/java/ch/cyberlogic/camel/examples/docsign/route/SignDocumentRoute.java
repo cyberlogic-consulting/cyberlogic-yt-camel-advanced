@@ -18,7 +18,7 @@ public class SignDocumentRoute extends RouteBuilder {
     public void configure() {
         from(INPUT_ENDPOINT)
                 .routeId(ROUTE_ID)
-                .bean("exchangeTransformer", "prepareSignDocumentRequest")
+                .bean("signDocumentRequestMapper", "prepareSignDocumentRequest")
                 .log("Sending document for signing: ${header." + Exchange.FILE_NAME + "}")
                 .marshal().json()
                 .to(https("{{signDocument.serviceUrl}}")
