@@ -21,7 +21,6 @@ import org.apache.camel.test.spring.junit5.ExcludeRoutes;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
@@ -49,8 +48,7 @@ public class SignDocumentRouteTest {
     private CamelContext camelContext;
 
     @Autowired
-    @Qualifier("objectMapperWithTimeModuleSupport")
-    private ObjectMapper objectMapper;
+    private ObjectMapper jsonMapper;
 
     @Produce(DIRECT_START)
     private ProducerTemplate producerTemplate;
@@ -125,7 +123,7 @@ public class SignDocumentRouteTest {
                 apiKey,
                 documentType
         );
-        ObjectWriter writer = objectMapper.writer();
+        ObjectWriter writer = jsonMapper.writer();
         byte[] expectedSerializedRequest = writer.writeValueAsBytes(expectedRequest);
         String status = "Status ok";
         String responseMessage = "Document signed";

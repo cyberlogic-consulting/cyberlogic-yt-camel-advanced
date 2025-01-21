@@ -1,6 +1,7 @@
 package ch.cyberlogic.camel.examples.docsign.service;
 
 import ch.cyberlogic.camel.examples.docsign.model.SignDocumentRequest;
+import ch.cyberlogic.camel.examples.docsign.util.TestConstants;
 import java.util.Base64;
 import org.apache.camel.Message;
 import org.apache.camel.support.DefaultMessage;
@@ -14,7 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class SignDocumentRequestMapperTest extends CamelExchangeSupport {
 
-    private final SignDocumentRequestMapper mapper = new SignDocumentRequestMapper();
+    private final SignDocumentRequestMapper mapper = new SignDocumentRequestMapper(
+            TestConstants.SIGN_DOCUMENT_SIGN_TYPE,
+            TestConstants.SIGN_DOCUMENT_API_KEY
+    );
 
     @Test
     void prepareSignDocumentRequestTest() {
@@ -23,15 +27,11 @@ public class SignDocumentRequestMapperTest extends CamelExchangeSupport {
         String ownerId = "bigBank11";
         String documentType = "taxReport";
         String clientId = "32766";
-        String signType = "CAdES-C";
-        String apiKey = "acb93ac2-2dce-4209-8ef2-2188ce2047c2";
-        mapper.setSignDocumentSignType(signType);
-        mapper.setSignDocumentApiKey(apiKey);
         SignDocumentRequest expectedRequest = new SignDocumentRequest(
                 Base64.getEncoder().encodeToString(contents.getBytes()),
                 ownerId,
-                signType,
-                apiKey,
+                TestConstants.SIGN_DOCUMENT_SIGN_TYPE,
+                TestConstants.SIGN_DOCUMENT_API_KEY,
                 documentType
         );
         Message message = new DefaultMessage(exchange);

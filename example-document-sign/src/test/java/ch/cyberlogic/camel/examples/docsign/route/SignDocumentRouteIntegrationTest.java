@@ -22,7 +22,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockserver.client.MockServerClient;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.context.ImportTestcontainers;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -84,8 +83,7 @@ public class SignDocumentRouteIntegrationTest {
     private CamelContext camelContext;
 
     @Autowired
-    @Qualifier("objectMapperWithTimeModuleSupport")
-    private ObjectMapper objectMapper;
+    private ObjectMapper jsonMapper;
 
     @DynamicPropertySource
     static void setUpProperties(DynamicPropertyRegistry registry) {
@@ -128,7 +126,7 @@ public class SignDocumentRouteIntegrationTest {
                 TestConstants.SIGN_DOCUMENT_API_KEY,
                 documentType
         );
-        ObjectWriter writer = objectMapper.writer();
+        ObjectWriter writer = jsonMapper.writer();
         String expectedSerializedRequest = writer.writeValueAsString(expectedRequest);
         String status = "SignDocumentResponse: Status ok";
         String responseMessage = "Document signed";

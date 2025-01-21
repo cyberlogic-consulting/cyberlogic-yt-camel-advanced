@@ -3,9 +3,9 @@ spring.application.name: example-document-sign
 camel:
   dataformat:
     jackson:
-      object-mapper: objectMapperWithTimeModuleSupport
+      object-mapper: jsonMapper
     jackson-xml:
-      xml-mapper: xmlMapperWithTimeModuleSupport
+      xml-mapper: xmlMapper
 
 sftp:
   server:
@@ -26,6 +26,8 @@ spring:
     broker-url: ${DOCSEND_ARTEMIS_URL}
     user: ${DOCSEND_ARTEMIS_USER}
     password: ${DOCSEND_ARTEMIS_PASSWORD}
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.http.HttpMessageConvertersAutoConfiguration
 
 signDocument:
   serviceUrl: ${DOCSEND_SIGNDOCUMENT_URL}
