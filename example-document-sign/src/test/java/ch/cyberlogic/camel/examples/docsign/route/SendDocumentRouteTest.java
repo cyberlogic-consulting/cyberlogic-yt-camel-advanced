@@ -78,26 +78,21 @@ public class SendDocumentRouteTest {
                 route -> route
                         .replaceFromWith(TEST_START)
         );
-        AdviceWith.adviceWith(
+        RouteTestUtil.replaceEndpoint(
                 camelContext,
                 SendDocumentRoute.ROUTE_ID,
-                route -> route
-                        .interceptSendToEndpoint("sql:" +
-                                "update document_sign_log set status=:#${body.getStatus}, last_update=:#${date:now} " +
-                                "where id=:#${headers." + ReadDocumentRoute.DATABASE_LOG_ID + "}"
-                        )
-                        .skipSendToOriginalEndpoint()
-                        .to(MOCK_SQL)
-        );
-        AdviceWith.adviceWith(
+                "sql:" +
+                        "update document_sign_log set status=:#${body.getStatus}, last_update=:#${date:now} " +
+                        "where id=:#${headers." + ReadDocumentRoute.DATABASE_LOG_ID + "}",
+                MOCK_SQL
+                );
+        RouteTestUtil.replaceEndpoint(
                 camelContext,
                 SendDocumentRoute.ROUTE_ID,
-                route -> route
-                        .interceptSendToEndpoint(jms("{{clientSend.clientSendRequestQueue}}")
-                                .replyTo("{{clientSend.clientSendResponseQueue}}")
-                                .getRawUri())
-                        .skipSendToOriginalEndpoint()
-                        .to(MOCK_JMS_SEND_SERVICE)
+                jms("{{clientSend.clientSendRequestQueue}}")
+                        .replyTo("{{clientSend.clientSendResponseQueue}}")
+                        .getRawUri(),
+                MOCK_JMS_SEND_SERVICE
         );
         RouteTestUtil.addEndpointOnRouteCompletion(
                 camelContext,

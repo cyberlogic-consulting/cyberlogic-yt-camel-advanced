@@ -3,6 +3,7 @@ package ch.cyberlogic.camel.examples.docsign.route;
 import ch.cyberlogic.camel.examples.docsign.model.SignDocumentRequest;
 import ch.cyberlogic.camel.examples.docsign.model.SignDocumentResponse;
 import ch.cyberlogic.camel.examples.docsign.service.SignDocumentRequestMapper;
+import ch.cyberlogic.camel.examples.docsign.util.RouteTestUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
@@ -76,36 +77,28 @@ public class SignDocumentRouteTest {
                 route -> route
                         .replaceFromWith(DIRECT_START)
         );
-        AdviceWith.adviceWith(
+        RouteTestUtil.replaceEndpoint(
                 camelContext,
                 SignDocumentRoute.ROUTE_ID,
-                route -> route
-                        .interceptSendToEndpoint("sql:" +
-                                "update document_sign_log set status=:#${body.getStatus}, last_update=:#${date:now} " +
-                                "where id=:#${headers." + ReadDocumentRoute.DATABASE_LOG_ID + "}"
-                        )
-                        .skipSendToOriginalEndpoint()
-                        .to(MOCK_SQL)
+                "sql:" +
+                        "update document_sign_log set status=:#${body.getStatus}, last_update=:#${date:now} " +
+                        "where id=:#${headers." + ReadDocumentRoute.DATABASE_LOG_ID + "}",
+                MOCK_SQL
         );
-        AdviceWith.adviceWith(
+        RouteTestUtil.replaceEndpoint(
                 camelContext,
                 SignDocumentRoute.ROUTE_ID,
-                route -> route
-                        .interceptSendToEndpoint(
-                                https("{{signDocument.serviceUrl}}")
-                                        .sslContextParameters("customCertificateSslContextParameters")
-                                        .skipRequestHeaders(true)
-                                        .getRawUri())
-                        .skipSendToOriginalEndpoint()
-                        .to(MOCK_HTTP_SIGN_SERVICE)
+                https("{{signDocument.serviceUrl}}")
+                        .sslContextParameters("customCertificateSslContextParameters")
+                        .skipRequestHeaders(true)
+                        .getRawUri(),
+                MOCK_HTTP_SIGN_SERVICE
         );
-        AdviceWith.adviceWith(
+        RouteTestUtil.replaceEndpoint(
                 camelContext,
                 SignDocumentRoute.ROUTE_ID,
-                route -> route
-                        .interceptSendToEndpoint(SendDocumentRoute.INPUT_ENDPOINT)
-                        .skipSendToOriginalEndpoint()
-                        .to(MOCK_SEND_DOCUMENT)
+                SendDocumentRoute.INPUT_ENDPOINT,
+                MOCK_SEND_DOCUMENT
         );
     }
 

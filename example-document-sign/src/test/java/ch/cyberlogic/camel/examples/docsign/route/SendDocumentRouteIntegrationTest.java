@@ -16,9 +16,7 @@ import java.util.Map;
 import org.apache.camel.CamelContext;
 import org.apache.camel.ConsumerTemplate;
 import org.apache.camel.EndpointInject;
-import org.apache.camel.ExchangePattern;
 import org.apache.camel.ProducerTemplate;
-import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.mock.MockEndpoint;
 import org.apache.camel.test.spring.junit5.CamelSpringBootTest;
 import org.apache.camel.test.spring.junit5.ExcludeRoutes;
@@ -43,7 +41,6 @@ import static ch.cyberlogic.camel.examples.docsign.service.FileMetadataExtractor
 import static ch.cyberlogic.camel.examples.docsign.util.RouteTestUtil.awaitUntilLogAppearsInDBWithStatus;
 import static ch.cyberlogic.camel.examples.docsign.util.containers.TestContainersConfigurations.getConfiguredArtemisContainer;
 import static ch.cyberlogic.camel.examples.docsign.util.containers.TestContainersConfigurations.getConfiguredPostgreSQLContainer;
-import static org.apache.camel.component.jms.JmsConstants.JMS_HEADER_REPLY_TO;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -57,7 +54,6 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 public class SendDocumentRouteIntegrationTest {
 
     private static final String MOCK_ROUTE_FINISHED = "mock:send-document-finished";
-    private static final String MOCK_CLIENT_SEND_SERVICE = "mock:client-send-service";
 
     @ServiceConnection
     static ArtemisContainer artemisContainer = getConfiguredArtemisContainer();
@@ -84,7 +80,7 @@ public class SendDocumentRouteIntegrationTest {
     @EndpointInject(MOCK_ROUTE_FINISHED)
     private MockEndpoint mockRouteFinished;
 
-    @EndpointInject(MOCK_CLIENT_SEND_SERVICE)
+    @EndpointInject(TestConstants.MOCK_CLIENT_SEND_SERVICE)
     private MockEndpoint mockClientSendService;
 
     @Autowired
@@ -108,24 +104,9 @@ public class SendDocumentRouteIntegrationTest {
                 SendDocumentRoute.ROUTE_ID,
                 MOCK_ROUTE_FINISHED);
 
-        camelContext.addRoutes(new RouteBuilder() {
-            @Override
-            public void configure() {
-                from("jms:" + TestConstants.CLIENT_SEND_REQUEST_QUEUE)
-                        .id("MockClientSendService")
-                        .log("MockClientSendService received request: ${body}; RequestHeaders: ${headers}")
-                        .to(MOCK_CLIENT_SEND_SERVICE)
-                        .setBody((exchange -> new ClientSendResponse(
-                                TestConstants.CLIENT_SEND_RESPONSE_STATUS_OK,
-                                TestConstants.CLIENT_SEND_RESPONSE_MESSAGE_REGULAR,
-                                TestConstants.CLIENT_SEND_RESPONSE_TIMESTAMP_REGULAR
-                        )))
-                        .marshal().jacksonXml()
-                        .toD()
-                        .pattern(ExchangePattern.InOnly)
-                        .uri("jms:${header." + JMS_HEADER_REPLY_TO + "}?preserveMessageQos=true");
-            }
-        });
+        RouteTestUtil.setUpMockClientSendService(
+                camelContext,
+                mockClientSendService);
     }
 
     @Test

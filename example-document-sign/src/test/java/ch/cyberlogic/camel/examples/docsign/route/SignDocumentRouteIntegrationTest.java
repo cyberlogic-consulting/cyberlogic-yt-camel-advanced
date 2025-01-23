@@ -14,7 +14,6 @@ import org.apache.camel.CamelContext;
 import org.apache.camel.ConsumerTemplate;
 import org.apache.camel.EndpointInject;
 import org.apache.camel.ProducerTemplate;
-import org.apache.camel.builder.AdviceWith;
 import org.apache.camel.component.mock.MockEndpoint;
 import org.apache.camel.test.spring.junit5.CamelSpringBootTest;
 import org.apache.camel.test.spring.junit5.ExcludeRoutes;
@@ -87,7 +86,7 @@ public class SignDocumentRouteIntegrationTest {
 
     @DynamicPropertySource
     static void setUpProperties(DynamicPropertyRegistry registry) {
-        mockServerContainer.start();
+        RouteTestUtil.waitUntilContainersStart(mockServerContainer);
         mockServerClient = new MockServerClient(
                 mockServerContainer.getHost(),
                 mockServerContainer.getServerPort()
@@ -101,13 +100,11 @@ public class SignDocumentRouteIntegrationTest {
     @BeforeEach
     void setUp() throws Exception {
         mock.reset();
-        AdviceWith.adviceWith(
+        RouteTestUtil.replaceEndpoint(
                 camelContext,
                 SignDocumentRoute.ROUTE_ID,
-                route -> route
-                        .interceptSendToEndpoint(SendDocumentRoute.INPUT_ENDPOINT)
-                        .skipSendToOriginalEndpoint()
-                        .to(MOCK_SEND_DOCUMENT)
+                SendDocumentRoute.INPUT_ENDPOINT,
+                MOCK_SEND_DOCUMENT
         );
     }
 

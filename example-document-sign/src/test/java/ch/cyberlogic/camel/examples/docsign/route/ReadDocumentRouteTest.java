@@ -1,6 +1,7 @@
 package ch.cyberlogic.camel.examples.docsign.route;
 
 import ch.cyberlogic.camel.examples.docsign.service.FileMetadataExtractor;
+import ch.cyberlogic.camel.examples.docsign.util.RouteTestUtil;
 import javax.sql.DataSource;
 import org.apache.camel.CamelContext;
 import org.apache.camel.EndpointInject;
@@ -61,24 +62,19 @@ public class ReadDocumentRouteTest {
                 route -> route
                         .replaceFromWith(DIRECT_START)
         );
-        AdviceWith.adviceWith(
+        RouteTestUtil.replaceEndpoint(
                 camelContext,
                 ReadDocumentRoute.ROUTE_ID,
-                route -> route
-                        .interceptSendToEndpoint("sql:" +
-                                "insert into document_sign_log (document_number, owner, last_update, status) " +
-                                "values (:#${headerAs(documentId, Integer)}, :#${header.ownerId}, :#${date:now}, 'Read document')"
-                        )
-                        .skipSendToOriginalEndpoint()
-                        .to(MOCK_SQL)
+                "sql:" +
+                        "insert into document_sign_log (document_number, owner, last_update, status) " +
+                        "values (:#${headerAs(documentId, Integer)}, :#${header.ownerId}, :#${date:now}, 'Read document')",
+                MOCK_SQL
         );
-        AdviceWith.adviceWith(
+        RouteTestUtil.replaceEndpoint(
                 camelContext,
                 ReadDocumentRoute.ROUTE_ID,
-                route -> route
-                        .interceptSendToEndpoint(SignDocumentRoute.INPUT_ENDPOINT)
-                        .skipSendToOriginalEndpoint()
-                        .to(MOCK_SIGN_DOCUMENT)
+                SignDocumentRoute.INPUT_ENDPOINT,
+                MOCK_SIGN_DOCUMENT
         );
     }
 

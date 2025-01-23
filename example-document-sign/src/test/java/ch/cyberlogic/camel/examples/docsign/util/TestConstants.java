@@ -38,5 +38,6 @@ public class TestConstants {
     public static final String CLIENT_SEND_RESPONSE_STATUS_OK = "ClientSendRequest: Status ok";
     public static final String CLIENT_SEND_RESPONSE_MESSAGE_REGULAR = "Document sent";
     public static final LocalDateTime CLIENT_SEND_RESPONSE_TIMESTAMP_REGULAR = LocalDateTime.now();
+    public static final String MOCK_CLIENT_SEND_SERVICE = "mock:client-send-service";
 
 }

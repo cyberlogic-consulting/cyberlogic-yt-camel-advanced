@@ -12,7 +12,6 @@ import org.apache.camel.EndpointInject;
 import org.apache.camel.Exchange;
 import org.apache.camel.FluentProducerTemplate;
 import org.apache.camel.Message;
-import org.apache.camel.builder.AdviceWith;
 import org.apache.camel.component.mock.MockEndpoint;
 import org.apache.camel.test.spring.junit5.CamelSpringBootTest;
 import org.apache.camel.test.spring.junit5.ExcludeRoutes;
@@ -27,7 +26,6 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.context.junit.jupiter.EnabledIf;
 import org.testcontainers.activemq.ArtemisContainer;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -43,7 +41,7 @@ import static ch.cyberlogic.camel.examples.docsign.util.containers.TestContainer
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-@EnabledIf("${test.integration.enabled:false}")
+//@EnabledIf("${test.integration.enabled:false}")
 @CamelSpringBootTest
 @ExcludeRoutes({SignDocumentRoute.class, SendDocumentRoute.class})
 @SpringBootTest
@@ -88,19 +86,20 @@ public class ReadDocumentRouteIntegrationTest {
 
     @DynamicPropertySource
     static void setUpProperties(DynamicPropertyRegistry registry) {
-        RouteTestUtil.setTestSftpServerProperties(registry, sftpContainer.getMappedPort(22));
+        RouteTestUtil.waitUntilContainersStart(sftpContainer);
+        RouteTestUtil.setTestSftpServerProperties(
+                registry,
+                sftpContainer.getMappedPort(22));
     }
 
     @BeforeEach
     void setUp() throws Exception {
         mock.reset();
-        AdviceWith.adviceWith(
+        RouteTestUtil.replaceEndpoint(
                 camelContext,
                 ReadDocumentRoute.ROUTE_ID,
-                route -> route
-                        .interceptSendToEndpoint(SignDocumentRoute.INPUT_ENDPOINT)
-                        .skipSendToOriginalEndpoint()
-                        .to(MOCK_SIGN_DOCUMENT)
+                SignDocumentRoute.INPUT_ENDPOINT,
+                MOCK_SIGN_DOCUMENT
         );
     }
 
