@@ -1,6 +1,8 @@
 spring.application.name: example-document-sign
 
 camel:
+  springboot:
+    main-run-controller: true
   dataformat:
     jackson:
       object-mapper: jsonMapper
