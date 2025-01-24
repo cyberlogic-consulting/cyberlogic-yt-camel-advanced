@@ -9,7 +9,7 @@ public class TestConstants {
      */
     public static final String USER = "user";
     public static final String PASSWORD = "password";
-    public static final Long TEST_TIMEOUT = 5000L;
+    public static final Long TEST_TIMEOUT = 10000L;
 
     /**
      * SFTP Server

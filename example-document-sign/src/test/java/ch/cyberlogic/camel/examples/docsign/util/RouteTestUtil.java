@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.camel.CamelContext;
 import org.apache.camel.ConsumerTemplate;
 import org.apache.camel.ExchangePattern;
-import org.apache.camel.builder.AdviceWith;
+import org.apache.camel.ProducerTemplate;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.mock.MockEndpoint;
 import org.awaitility.Awaitility;
@@ -53,19 +53,6 @@ public class RouteTestUtil {
                         != null);
     }
 
-    public static void addEndpointOnRouteCompletion(
-            CamelContext camelContext,
-            String routeId,
-            String onCompletionEndpointUri) throws Exception {
-        AdviceWith.adviceWith(
-                camelContext,
-                routeId,
-                route -> route
-                        .onCompletion()
-                        .to(onCompletionEndpointUri)
-        );
-    }
-
     public static void configureRegularSignServiceResponse(
             MockServerClient mockServerClient,
             String expectedRequestJson,
@@ -111,21 +98,6 @@ public class RouteTestUtil {
                 () -> TestConstants.CLIENT_SEND_RESPONSE_QUEUE);
     }
 
-    public static void replaceEndpoint(
-            CamelContext camelContext,
-            String routeId,
-            String originalEndpoint,
-            String replacement) throws Exception {
-        AdviceWith.adviceWith(
-                camelContext,
-                routeId,
-                route -> route
-                        .interceptSendToEndpoint(originalEndpoint)
-                        .skipSendToOriginalEndpoint()
-                        .to(replacement)
-        );
-    }
-
     public static void waitUntilContainersStart(GenericContainer<?>... containers) {
         for (GenericContainer<?> container : containers) {
             container.start();
@@ -153,5 +125,21 @@ public class RouteTestUtil {
                     }
                 }
         );
+    }
+
+    public static void resetMockEndpoints(MockEndpoint... mockEndpoints) {
+        for (MockEndpoint mockEndpoint : mockEndpoints) {
+            mockEndpoint.reset();
+        }
+    }
+
+    public static void checkAssertionsSatisfied(MockEndpoint... mockEndpoints) throws InterruptedException {
+        for (MockEndpoint mockEndpoint : mockEndpoints) {
+            mockEndpoint.assertIsSatisfied(TestConstants.TEST_TIMEOUT);
+        }
+    }
+
+    public static void cleanUpIntegrationDB(ProducerTemplate producerTemplate) {
+        producerTemplate.sendBody("sql:delete from document_sign_log", null);
     }
 }

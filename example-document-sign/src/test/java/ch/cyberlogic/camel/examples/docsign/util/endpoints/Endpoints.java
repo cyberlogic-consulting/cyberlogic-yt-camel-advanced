@@ -14,12 +14,12 @@ public class Endpoints {
     }
 
     public static String getSftpEndpointUriWithErrorDirectory() {
-        return Endpoints.sftpServer().getRawUri()
+        return sftpServer().getRawUri()
                 .replace("{{sftp.server.directory}}", "{{sftp.server.directory}}/.processing/.error");
     }
 
     public static String getSftpEndpointUriWithDoneDirectory() {
-        return Endpoints.sftpServer().getRawUri()
+        return sftpServer().getRawUri()
                 .replace("{{sftp.server.directory}}", "{{sftp.server.directory}}/.processing/.done");
     }
 

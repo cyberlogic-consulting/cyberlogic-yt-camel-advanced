@@ -4,6 +4,7 @@ import ch.cyberlogic.camel.examples.docsign.model.ClientSendRequest;
 import ch.cyberlogic.camel.examples.docsign.model.ClientSendResponse;
 import ch.cyberlogic.camel.examples.docsign.model.SignDocumentResponse;
 import ch.cyberlogic.camel.examples.docsign.service.ClientSendRequestMapper;
+import ch.cyberlogic.camel.examples.docsign.util.AdviceWithUtilConfigurable;
 import ch.cyberlogic.camel.examples.docsign.util.RouteTestUtil;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectWriter;
@@ -16,7 +17,6 @@ import org.apache.camel.CamelContext;
 import org.apache.camel.EndpointInject;
 import org.apache.camel.Produce;
 import org.apache.camel.ProducerTemplate;
-import org.apache.camel.builder.AdviceWith;
 import org.apache.camel.component.mock.MockEndpoint;
 import org.apache.camel.test.spring.junit5.CamelSpringBootTest;
 import org.apache.camel.test.spring.junit5.ExcludeRoutes;
@@ -28,9 +28,12 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import static ch.cyberlogic.camel.examples.docsign.route.ReadDocumentRoute.DATABASE_LOG_ID;
 import static org.apache.camel.builder.Builder.constant;
 import static org.apache.camel.builder.endpoint.StaticEndpointBuilders.jms;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -42,6 +45,7 @@ import static org.mockito.Mockito.verify;
 public class SendDocumentRouteTest {
 
     private static final String MOCK_SQL = "mock:sql";
+    private static final String MOCK_ON_EXCEPTION_SQL = "mock:on-exception-sql";
     private static final String MOCK_JMS_SEND_SERVICE = "mock:jms-send-service";
     private static final String MOCK_ROUTE_FINISHED = "mock:send-document-finished";
     private static final String TEST_START = "direct:send-document-start";
@@ -56,7 +60,7 @@ public class SendDocumentRouteTest {
     private ProducerTemplate producerTemplate;
 
     @MockitoBean
-    private ClientSendRequestMapper exchangeTransformer;
+    private ClientSendRequestMapper clientSendRequestMapper;
 
     @MockitoBean
     DataSource dataSource;
@@ -70,38 +74,40 @@ public class SendDocumentRouteTest {
     @EndpointInject(MOCK_JMS_SEND_SERVICE)
     private MockEndpoint mockJmsSendService;
 
+    @EndpointInject(MOCK_ON_EXCEPTION_SQL)
+    private MockEndpoint mockOnExceptionSql;
+
     @BeforeEach
     void replaceEndpoints() throws Exception {
-        AdviceWith.adviceWith(
-                camelContext,
-                SendDocumentRoute.ROUTE_ID,
-                route -> route
-                        .replaceFromWith(TEST_START)
+        RouteTestUtil.resetMockEndpoints(
+                mockSql,
+                mockJmsSendService,
+                mockRouteFinished,
+                mockOnExceptionSql
         );
-        RouteTestUtil.replaceEndpoint(
+        AdviceWithUtilConfigurable advice = new AdviceWithUtilConfigurable(
                 camelContext,
-                SendDocumentRoute.ROUTE_ID,
-                "sql:" +
+                SendDocumentRoute.ROUTE_ID
+        );
+        advice.replaceFromWith(TEST_START);
+        advice.replaceEndpoint("sql:" +
                         "update document_sign_log set status=:#${body.getStatus}, last_update=:#${date:now} " +
                         "where id=:#${headers." + ReadDocumentRoute.DATABASE_LOG_ID + "}",
-                MOCK_SQL
-                );
-        RouteTestUtil.replaceEndpoint(
-                camelContext,
-                SendDocumentRoute.ROUTE_ID,
+                MOCK_SQL);
+        advice.replaceEndpoint(
                 jms("{{clientSend.clientSendRequestQueue}}")
                         .replyTo("{{clientSend.clientSendResponseQueue}}")
                         .getRawUri(),
-                MOCK_JMS_SEND_SERVICE
+                MOCK_JMS_SEND_SERVICE);
+        advice.replaceEndpoint(
+                ErrorHandlingConfiguration.SQL_WRITE_EXCEPTION_ENDPOINT,
+                MOCK_ON_EXCEPTION_SQL
         );
-        RouteTestUtil.addEndpointOnRouteCompletion(
-                camelContext,
-                SendDocumentRoute.ROUTE_ID,
-                MOCK_ROUTE_FINISHED);
+        advice.addEndpointOnRouteCompletion(MOCK_ROUTE_FINISHED);
     }
 
     @Test
-    void signDocumentRouteTest() throws JsonProcessingException {
+    void signDocumentRouteTest() throws JsonProcessingException, InterruptedException {
         String contents = "Hello World";
         String documentId = "32767";
         String ownerId = "bigBank11";
@@ -131,9 +137,9 @@ public class SendDocumentRouteTest {
         );
         mockJmsSendService.returnReplyBody(constant(writer.writeValueAsBytes(expectedResponse)));
 
-        camelContext.createProducerTemplate().sendBody(TEST_START, expectedRequest);
+        producerTemplate.sendBody(expectedRequest);
 
-        verify(exchangeTransformer, times(1)).prepareClientSendRequest(any());
+        verify(clientSendRequestMapper, times(1)).prepareClientSendRequest(any());
 
         mockJmsSendService.expectedMessageCount(1);
         mockJmsSendService.expectedBodiesReceived(List.of(expectedSerializedRequest));
@@ -142,5 +148,45 @@ public class SendDocumentRouteTest {
 
         mockRouteFinished.expectedMessageCount(1);
         mockRouteFinished.expectedBodiesReceived(expectedResponse);
+
+        mockOnExceptionSql.expectedMessageCount(0);
+
+        RouteTestUtil.checkAssertionsSatisfied(
+                mockJmsSendService,
+                mockSql,
+                mockRouteFinished,
+                mockOnExceptionSql
+        );
+    }
+
+    @Test
+    void signDocumentRouteExceptionTest() throws InterruptedException {
+        String expectedBody = "TestBody";
+        String dbLogId = "1";
+        RuntimeException expected = new RuntimeException("Test Exception");
+        doThrow(expected).when(clientSendRequestMapper).prepareClientSendRequest(any());
+
+        assertThrows(expected.getClass(), () -> producerTemplate.sendBodyAndHeader(
+                expectedBody,
+                DATABASE_LOG_ID,
+                dbLogId)
+        );
+
+
+        mockJmsSendService.expectedMessageCount(0);
+        mockSql.expectedMessageCount(0);
+        mockRouteFinished.expectedMessageCount(0);
+        mockOnExceptionSql.expectedMessageCount(1);
+        mockOnExceptionSql.expectedHeaderReceived(DATABASE_LOG_ID, dbLogId);
+        mockOnExceptionSql.expectedBodiesReceived(expectedBody);
+        mockOnExceptionSql.expectedMessagesMatches(message ->
+                message.getException().equals(expected));
+
+        RouteTestUtil.checkAssertionsSatisfied(
+                mockJmsSendService,
+                mockSql,
+                mockRouteFinished,
+                mockOnExceptionSql
+        );
     }
 }

@@ -1,6 +1,7 @@
 package ch.cyberlogic.camel.examples.docsign.route;
 
 import ch.cyberlogic.camel.examples.docsign.service.FileMetadataExtractor;
+import ch.cyberlogic.camel.examples.docsign.util.AdviceWithUtilConfigurable;
 import ch.cyberlogic.camel.examples.docsign.util.RouteTestUtil;
 import javax.sql.DataSource;
 import org.apache.camel.CamelContext;
@@ -8,7 +9,6 @@ import org.apache.camel.EndpointInject;
 import org.apache.camel.Exchange;
 import org.apache.camel.Produce;
 import org.apache.camel.ProducerTemplate;
-import org.apache.camel.builder.AdviceWith;
 import org.apache.camel.component.mock.MockEndpoint;
 import org.apache.camel.component.sql.SqlConstants;
 import org.apache.camel.test.spring.junit5.CamelSpringBootTest;
@@ -21,7 +21,9 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -34,6 +36,7 @@ public class ReadDocumentRouteTest {
 
     private static final String MOCK_SIGN_DOCUMENT = "mock:" + SignDocumentRoute.INPUT_ENDPOINT;
     private static final String MOCK_SQL = "mock:sql";
+    private static final String MOCK_ON_EXCEPTION_SQL = "mock:on-exception-sql";
     private static final String DIRECT_START = "direct:read-document-start";
 
     @Autowired
@@ -54,37 +57,35 @@ public class ReadDocumentRouteTest {
     @EndpointInject(MOCK_SQL)
     private MockEndpoint mockSql;
 
+    @EndpointInject(MOCK_ON_EXCEPTION_SQL)
+    private MockEndpoint mockOnExceptionSql;
+
     @BeforeEach
     void replaceEndpoints() throws Exception {
-        AdviceWith.adviceWith(
+        RouteTestUtil.resetMockEndpoints(mockSql, mockSignDocument, mockOnExceptionSql);
+        AdviceWithUtilConfigurable advice = new AdviceWithUtilConfigurable(
                 camelContext,
-                ReadDocumentRoute.ROUTE_ID,
-                route -> route
-                        .replaceFromWith(DIRECT_START)
-        );
-        RouteTestUtil.replaceEndpoint(
-                camelContext,
-                ReadDocumentRoute.ROUTE_ID,
-                "sql:" +
+                ReadDocumentRoute.ROUTE_ID);
+        advice.replaceFromWith(DIRECT_START);
+        advice.replaceEndpoint("sql:" +
                         "insert into document_sign_log (document_number, owner, last_update, status) " +
                         "values (:#${headerAs(documentId, Integer)}, :#${header.ownerId}, :#${date:now}, 'Read document')",
-                MOCK_SQL
-        );
-        RouteTestUtil.replaceEndpoint(
-                camelContext,
-                ReadDocumentRoute.ROUTE_ID,
+                MOCK_SQL);
+        advice.replaceEndpoint(
                 SignDocumentRoute.INPUT_ENDPOINT,
-                MOCK_SIGN_DOCUMENT
+                MOCK_SIGN_DOCUMENT);
+        advice.replaceEndpoint(
+                ErrorHandlingConfiguration.SQL_WRITE_EXCEPTION_ENDPOINT,
+                MOCK_ON_EXCEPTION_SQL
         );
     }
 
     @Test
-    void readDocumentRouteTest() {
+    void readDocumentRouteTest() throws InterruptedException {
         String contents = "Hello World";
         String fileName = "hello.txt";
 
-        camelContext.createProducerTemplate().sendBodyAndHeader(
-                DIRECT_START,
+        producerTemplate.sendBodyAndHeader(
                 contents,
                 Exchange.FILE_NAME,
                 fileName
@@ -96,7 +97,36 @@ public class ReadDocumentRouteTest {
         mockSignDocument.expectedMessageCount(1);
         mockSignDocument.expectedMessagesMatches(
                 exchange -> exchange.getMessage().getHeader(ReadDocumentRoute.DATABASE_LOG_ID) != null);
+        mockOnExceptionSql.expectedMessageCount(0);
+
+        RouteTestUtil.checkAssertionsSatisfied(
+                mockSql,
+                mockSignDocument,
+                mockOnExceptionSql
+        );
     }
 
+    @Test
+    void readDocumentRouteExceptionTest() throws InterruptedException {
+        String contents = "Hello World";
+        String fileName = "hello.txt";
+        RuntimeException expected = new RuntimeException("Test Exception");
+        doThrow(expected).when(fileMetadataExtractor).extractFileMetadata(any());
+
+        assertThrows(expected.getClass(), () -> producerTemplate.sendBodyAndHeader(
+                contents,
+                Exchange.FILE_NAME,
+                fileName
+        ));
+
+        mockSql.expectedMessageCount(0);
+        mockSignDocument.expectedMessageCount(0);
+        mockOnExceptionSql.expectedMessageCount(0);
+        RouteTestUtil.checkAssertionsSatisfied(
+                mockSql,
+                mockSignDocument,
+                mockOnExceptionSql
+        );
+    }
 
 }

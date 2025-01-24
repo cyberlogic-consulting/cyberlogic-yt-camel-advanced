@@ -5,6 +5,7 @@ import ch.cyberlogic.camel.examples.docsign.model.ClientSendRequest;
 import ch.cyberlogic.camel.examples.docsign.model.ClientSendResponse;
 import ch.cyberlogic.camel.examples.docsign.model.SignDocumentResponse;
 import ch.cyberlogic.camel.examples.docsign.service.SignDocumentRequestMapper;
+import ch.cyberlogic.camel.examples.docsign.util.AdviceWithUtilConfigurable;
 import ch.cyberlogic.camel.examples.docsign.util.RouteTestUtil;
 import ch.cyberlogic.camel.examples.docsign.util.TestConstants;
 import com.fasterxml.jackson.databind.ObjectWriter;
@@ -99,10 +100,8 @@ public class SendDocumentRouteIntegrationTest {
         mockRouteFinished.reset();
         mockClientSendService.reset();
 
-        RouteTestUtil.addEndpointOnRouteCompletion(
-                camelContext,
-                SendDocumentRoute.ROUTE_ID,
-                MOCK_ROUTE_FINISHED);
+        new AdviceWithUtilConfigurable(camelContext, SendDocumentRoute.ROUTE_ID)
+                .addEndpointOnRouteCompletion(MOCK_ROUTE_FINISHED);
 
         RouteTestUtil.setUpMockClientSendService(
                 camelContext,

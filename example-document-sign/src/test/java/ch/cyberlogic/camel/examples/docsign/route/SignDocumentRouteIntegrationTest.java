@@ -2,6 +2,7 @@ package ch.cyberlogic.camel.examples.docsign.route;
 
 import ch.cyberlogic.camel.examples.docsign.model.SignDocumentRequest;
 import ch.cyberlogic.camel.examples.docsign.model.SignDocumentResponse;
+import ch.cyberlogic.camel.examples.docsign.util.AdviceWithUtilConfigurable;
 import ch.cyberlogic.camel.examples.docsign.util.RouteTestUtil;
 import ch.cyberlogic.camel.examples.docsign.util.TestConstants;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -100,12 +101,10 @@ public class SignDocumentRouteIntegrationTest {
     @BeforeEach
     void setUp() throws Exception {
         mock.reset();
-        RouteTestUtil.replaceEndpoint(
-                camelContext,
-                SignDocumentRoute.ROUTE_ID,
-                SendDocumentRoute.INPUT_ENDPOINT,
-                MOCK_SEND_DOCUMENT
-        );
+        new AdviceWithUtilConfigurable(camelContext, SignDocumentRoute.ROUTE_ID)
+                .replaceEndpoint(
+                        SendDocumentRoute.INPUT_ENDPOINT,
+                        MOCK_SEND_DOCUMENT);
     }
 
     @Test

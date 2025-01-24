@@ -2,7 +2,6 @@ package ch.cyberlogic.camel.examples.docsign;
 
 import ch.cyberlogic.camel.examples.docsign.model.SignDocumentRequest;
 import ch.cyberlogic.camel.examples.docsign.model.SignDocumentResponse;
-import ch.cyberlogic.camel.examples.docsign.service.SignDocumentRequestMapper;
 import ch.cyberlogic.camel.examples.docsign.util.RouteTestUtil;
 import ch.cyberlogic.camel.examples.docsign.util.TestConstants;
 import ch.cyberlogic.camel.examples.docsign.util.endpoints.Endpoints;
@@ -80,8 +79,6 @@ public class ExampleDocumentSignIntegrationTest {
     @EndpointInject(TestConstants.MOCK_CLIENT_SEND_SERVICE)
     private MockEndpoint mockClientSendService;
 
-    @Autowired
-    private SignDocumentRequestMapper signDocumentRequestMapper;
 
     @Autowired
     private FluentProducerTemplate producerTemplate;
@@ -113,6 +110,7 @@ public class ExampleDocumentSignIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        RouteTestUtil.cleanUpIntegrationDB(camelContext.createProducerTemplate());
         RouteTestUtil.setUpMockClientSendService(
                 camelContext,
                 mockClientSendService);
@@ -129,7 +127,6 @@ public class ExampleDocumentSignIntegrationTest {
                 + "_" + ownerId
                 + "_" + documentType
                 + "_" + clientId + ".pdf";
-        String status = "Read document";
         SignDocumentRequest expectedRequest = new SignDocumentRequest(
                 Base64.getEncoder().encodeToString(contents.getBytes()),
                 ownerId,
@@ -166,7 +163,7 @@ public class ExampleDocumentSignIntegrationTest {
                 TestConstants.CLIENT_SEND_RESPONSE_STATUS_OK,
                 TestConstants.TEST_TIMEOUT);
         Map dbResult = consumerTemplate.receive(
-                        "sql:select * from document_sign_log where id = 1",
+                        "sql:select * from document_sign_log where document_number = " + documentId,
                         TestConstants.TEST_TIMEOUT)
                 .getMessage().getBody(Map.class);
         Exchange initialFileFromDoneFolderExchange = consumerTemplate.receive(
@@ -204,6 +201,10 @@ public class ExampleDocumentSignIntegrationTest {
                 + "_" + ownerId
                 + "_" + documentType
                 + "_" + clientId + ".pdf";
+        String errorStatus = "HTTP operation failed invoking " +
+                mockServerContainer.getSecureEndpoint() +
+                TestConstants.SIGN_DOCUMENT_SERVICE_PATH +
+                " with statusCode: 404";
 
         producerTemplate
                 .withBody(contents)
@@ -212,10 +213,19 @@ public class ExampleDocumentSignIntegrationTest {
                 .send();
         Exchange initialFileFromErrorFolderExchange = consumerTemplate.receive(
                 Endpoints.getSftpEndpointUriWithErrorDirectory(), TestConstants.TEST_TIMEOUT);
+        Map dbResult = consumerTemplate.receive(
+                        "sql:select * from document_sign_log where document_number = " + documentId,
+                        TestConstants.TEST_TIMEOUT)
+                .getMessage().getBody(Map.class);
 
         assertNotNull(initialFileFromErrorFolderExchange);
         Message initialFileFromErrorFolder = initialFileFromErrorFolderExchange.getMessage();
         assertEquals(fileName, initialFileFromErrorFolder.getHeader(Exchange.FILE_NAME));
         assertEquals(contents, initialFileFromErrorFolder.getBody(String.class));
+
+        assertEquals(0, dbResult.get("document_number"));
+        assertEquals(ownerId, dbResult.get("owner"));
+        assertEquals(errorStatus, dbResult.get("status"));
+        assertNotNull(dbResult.get("last_update"));
     }
 }

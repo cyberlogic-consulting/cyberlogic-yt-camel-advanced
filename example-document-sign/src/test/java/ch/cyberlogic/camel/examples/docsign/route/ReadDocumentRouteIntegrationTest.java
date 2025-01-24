@@ -2,6 +2,7 @@ package ch.cyberlogic.camel.examples.docsign.route;
 
 import ch.cyberlogic.camel.examples.docsign.configuration.SSLContextParamsConfiguration;
 import ch.cyberlogic.camel.examples.docsign.service.SignDocumentRequestMapper;
+import ch.cyberlogic.camel.examples.docsign.util.AdviceWithUtilConfigurable;
 import ch.cyberlogic.camel.examples.docsign.util.RouteTestUtil;
 import ch.cyberlogic.camel.examples.docsign.util.TestConstants;
 import ch.cyberlogic.camel.examples.docsign.util.endpoints.Endpoints;
@@ -26,6 +27,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.junit.jupiter.EnabledIf;
 import org.testcontainers.activemq.ArtemisContainer;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -41,7 +43,7 @@ import static ch.cyberlogic.camel.examples.docsign.util.containers.TestContainer
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-//@EnabledIf("${test.integration.enabled:false}")
+@EnabledIf("${test.integration.enabled:false}")
 @CamelSpringBootTest
 @ExcludeRoutes({SignDocumentRoute.class, SendDocumentRoute.class})
 @SpringBootTest
@@ -95,12 +97,11 @@ public class ReadDocumentRouteIntegrationTest {
     @BeforeEach
     void setUp() throws Exception {
         mock.reset();
-        RouteTestUtil.replaceEndpoint(
-                camelContext,
-                ReadDocumentRoute.ROUTE_ID,
-                SignDocumentRoute.INPUT_ENDPOINT,
-                MOCK_SIGN_DOCUMENT
-        );
+        new AdviceWithUtilConfigurable(camelContext, ReadDocumentRoute.ROUTE_ID)
+                .replaceEndpoint(
+                        SignDocumentRoute.INPUT_ENDPOINT,
+                        MOCK_SIGN_DOCUMENT
+                );
     }
 
     @Test
