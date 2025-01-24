@@ -10,12 +10,12 @@
 	<properties>
 		<maven.compiler.showDeprecation>true</maven.compiler.showDeprecation>
 		<maven.compiler.showWarnings>true</maven.compiler.showWarnings>
-		<maven.compiler.release>17</maven.compiler.release>
+		<maven.compiler.release>21</maven.compiler.release>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 		<camel.version>4.9.0</camel.version>
 		<mockserver.netty.version>5.15.0</mockserver.netty.version>
-		<spring.boot.version>3.4.1</spring.boot.version>
+		<spring.boot.version>3.4.0</spring.boot.version>
 	</properties>
 	<dependencyManagement>
 		<dependencies>
