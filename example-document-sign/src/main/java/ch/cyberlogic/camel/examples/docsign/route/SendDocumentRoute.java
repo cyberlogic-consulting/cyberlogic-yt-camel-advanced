@@ -1,6 +1,7 @@
 package ch.cyberlogic.camel.examples.docsign.route;
 
 import ch.cyberlogic.camel.examples.docsign.model.ClientSendResponse;
+import ch.cyberlogic.camel.examples.docsign.service.ClientSendRequestMapper;
 import ch.cyberlogic.camel.examples.docsign.service.FileMetadataExtractor;
 import org.apache.camel.Exchange;
 import org.apache.camel.ExchangePattern;
@@ -16,11 +17,17 @@ public class SendDocumentRoute extends RouteBuilder {
 
     public static final String INPUT_ENDPOINT = "direct:sendDocument";
 
+    private final ClientSendRequestMapper clientSendRequestMapper;
+
+    public SendDocumentRoute(ClientSendRequestMapper clientSendRequestMapper) {
+        this.clientSendRequestMapper = clientSendRequestMapper;
+    }
+
     @Override
     public void configure() throws Exception {
         from(INPUT_ENDPOINT)
                 .routeId(ROUTE_ID)
-                .bean("clientSendRequestMapper", "prepareClientSendRequest")
+                .bean(clientSendRequestMapper)
                 .log("Sending signed document to client: ${header." + FileMetadataExtractor.CLIENT_ID + "}")
                 .marshal().jacksonXml()
                 .to(ExchangePattern.InOut,

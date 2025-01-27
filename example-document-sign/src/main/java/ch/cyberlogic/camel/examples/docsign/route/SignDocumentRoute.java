@@ -1,6 +1,7 @@
 package ch.cyberlogic.camel.examples.docsign.route;
 
 import ch.cyberlogic.camel.examples.docsign.model.SignDocumentResponse;
+import ch.cyberlogic.camel.examples.docsign.service.SignDocumentRequestMapper;
 import org.apache.camel.Exchange;
 import org.apache.camel.builder.RouteBuilder;
 import org.springframework.stereotype.Component;
@@ -14,11 +15,17 @@ public class SignDocumentRoute extends RouteBuilder {
 
     public static final String INPUT_ENDPOINT = "direct:signDocument";
 
+    private final SignDocumentRequestMapper signDocumentRequestMapper;
+
+    public SignDocumentRoute(SignDocumentRequestMapper signDocumentRequestMapper) {
+        this.signDocumentRequestMapper = signDocumentRequestMapper;
+    }
+
     @Override
     public void configure() {
         from(INPUT_ENDPOINT)
                 .routeId(ROUTE_ID)
-                .bean("signDocumentRequestMapper", "prepareSignDocumentRequest")
+                .bean(signDocumentRequestMapper)
                 .log("Sending document for signing: ${header." + Exchange.FILE_NAME + "}")
                 .marshal().json()
                 .to(https("{{signDocument.serviceUrl}}")

@@ -1,5 +1,6 @@
 package ch.cyberlogic.camel.examples.docsign.route;
 
+import ch.cyberlogic.camel.examples.docsign.service.FileMetadataExtractor;
 import org.apache.camel.Exchange;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.sql.SqlConstants;
@@ -15,6 +16,12 @@ public class ReadDocumentRoute extends RouteBuilder {
 
     public static final String DATABASE_LOG_ID = "DatabaseLogId";
 
+    private final FileMetadataExtractor fileMetadataExtractor;
+
+    public ReadDocumentRoute(FileMetadataExtractor fileMetadataExtractor) {
+        this.fileMetadataExtractor = fileMetadataExtractor;
+    }
+
     @Override
     public void configure() {
         from(sftp("{{sftp.server.host}}:{{sftp.server.port}}/{{sftp.server.directory}}")
@@ -26,7 +33,7 @@ public class ReadDocumentRoute extends RouteBuilder {
                     .move(".done"))
                 .routeId(ROUTE_ID)
                 .log("Read document: ${header." + Exchange.FILE_NAME + "}")
-                .bean("fileMetadataExtractor", "extractFileMetadata")
+                .bean(fileMetadataExtractor)
                 .setHeader(SqlConstants.SQL_RETRIEVE_GENERATED_KEYS, constant(true))
                 .to(sql(
                         "insert into document_sign_log (document_number, owner, last_update, status) " +
