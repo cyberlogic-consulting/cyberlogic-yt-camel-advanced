@@ -24,11 +24,19 @@ public class TestContainersConfigurations {
         List<String> initScripts = new ArrayList<>();
         initScripts.add("it/db/init.sql");
         initScripts.addAll(additionalInitScripts);
-        return new PostgreSQLContainer<>("postgres:17.2-alpine")
+        PostgreSQLContainer<?> result = new PostgreSQLContainer<>("postgres:17.2-alpine")
                 .withDatabaseName(DBName)
                 .withUsername(User)
-                .withPassword(Password)
-                .withInitScripts(initScripts);
+                .withPassword(Password);
+        int i = 0;
+        for (String script : initScripts) {
+            String scriptFileName = script.substring(script.lastIndexOf('/') + 1);
+            result = result.withCopyFileToContainer(
+                    MountableFile.forClasspathResource(script, 0777),
+                    "/docker-entrypoint-initdb.d/" + i + "_" + scriptFileName);
+            i++;
+        }
+        return result;
     }
 
     public static PostgreSQLContainer<?> getConfiguredPostgreSQLContainer(String User, String Password, String DBName) {

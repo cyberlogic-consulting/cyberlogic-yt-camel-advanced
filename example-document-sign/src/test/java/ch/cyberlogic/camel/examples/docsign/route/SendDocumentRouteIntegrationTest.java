@@ -25,13 +25,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.testcontainers.context.ImportTestcontainers;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.junit.jupiter.EnabledIf;
 import org.testcontainers.activemq.ArtemisContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -66,10 +66,10 @@ public class SendDocumentRouteIntegrationTest {
             TestConstants.DB_NAME,
             List.of("it/db/add-row.sql"));
 
-    @MockitoBean
+    @MockBean
     private SSLContextParamsConfiguration excludedSSLContextParamsConfiguration;
 
-    @MockitoBean
+    @MockBean
     private SignDocumentRequestMapper excludedSignDocumentRequestMapper;
 
     @Autowired

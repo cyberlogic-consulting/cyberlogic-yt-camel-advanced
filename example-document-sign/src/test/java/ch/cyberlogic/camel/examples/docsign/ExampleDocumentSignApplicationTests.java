@@ -3,14 +3,14 @@ package ch.cyberlogic.camel.examples.docsign;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 @SpringBootTest
 @ActiveProfiles("junit")
 class ExampleDocumentSignApplicationTests {
 
-	@MockitoBean
+	@MockBean
 	DataSource dataSource;
 
 	@Test

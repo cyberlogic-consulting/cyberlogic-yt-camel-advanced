@@ -24,9 +24,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import static ch.cyberlogic.camel.examples.docsign.route.ReadDocumentRoute.DATABASE_LOG_ID;
 import static org.apache.camel.builder.Builder.constant;
@@ -58,10 +58,10 @@ public class SendDocumentRouteTest {
     @Produce(TEST_START)
     private ProducerTemplate producerTemplate;
 
-    @MockitoBean
+    @MockBean
     private ClientSendRequestMapper clientSendRequestMapper;
 
-    @MockitoBean
+    @MockBean
     DataSource dataSource;
 
     @EndpointInject(MOCK_ROUTE_FINISHED)
