@@ -1,0 +1,76 @@
+name: example-document-sign-compose
+services:
+  sftp:
+    image: atmoz/sftp:alpine
+    command: "docsend_sftp_user:docsend_sftp_password:::/documents"
+    container_name: sftp
+    ports:
+      - "22:22"
+    volumes:
+      - ./sftp/ssh_host_ed25519_key:/etc/ssh/ssh_host_ed25519_key
+  example-document-sign:
+    image: cyberlogic.ch/examples/example-document-sign:0.0.1-SNAPSHOT
+    container_name: example-document-sign
+    depends_on:
+      - sftp
+      - integration-pgdb
+      - client-send-service
+      - sign-document-service
+    environment:
+      DOCSEND_SFTP_HOST: sftp
+      DOCSEND_SFTP_PORT: 22
+      DOCSEND_SFTP_USER: docsend_sftp_user
+      DOCSEND_SFTP_PASSWORD: docsend_sftp_password
+      DOCSEND_DB_URL: integration-pgdb
+      DOCSEND_DB_USER: docsend_db_user
+      DOCSEND_DB_PASSWORD: docsend_db_password
+      DOCSEND_ARTEMIS_URL: tcp://client-send-service:61616
+      DOCSEND_ARTEMIS_USER: artemis
+      DOCSEND_ARTEMIS_PASSWORD: artemis
+      DOCSEND_SENDDOCUMENT_QUEUE_REQUEST: send-document-request
+      DOCSEND_SENDDOCUMENT_QUEUE_RESPONSE: send-document-response
+      DOCSEND_SIGNDOCUMENT_URL: https://sign-document-service:443/SignDocument/sign
+      DOCSEND_SIGNDOCUMENT_APIKEY: acb93ac2-2dce-4209-8ef2-2188ce2047c2
+      DOCSEND_SIGNDOCUMENT_TRUSTSTORE: file:/workspace/test_truststore.jks
+      DOCSEND_SIGNDOCUMENT_TRUSTSTORE_PASSWORD: password
+    volumes:
+      - ./docsign/known_hosts:/etc/.ssh/known_hosts
+      - ./docsign/test_truststore.jks:/workspace/test_truststore.jks
+  integration-pgdb:
+    image: postgres:17.2-alpine
+    container_name: integration-pgdb
+    environment:
+      POSTGRES_DB: integration
+      POSTGRES_USER: docsend_db_user
+      POSTGRES_PASSWORD: docsend_db_password
+    volumes:
+      - ./pgsql/init.sql:/docker-entrypoint-initdb.d/init.sql
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin4
+    ports:
+      - "8888:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: user-name@domain-name.com
+      PGADMIN_DEFAULT_PASSWORD: strong-password
+  client-send-service:
+    image: apache/activemq-artemis:2.39.0-alpine
+    container_name: client-send-service
+    ports:
+      - "8161:8161"
+  sign-document-service:
+    image: mockserver/mockserver:5.15.0
+    container_name: sign-document-service
+    command: -serverPort 443
+    environment:
+      MOCKSERVER_TLS_PRIVATE_KEY_PATH: /config/ssl/mockserver_private_key_pk8.pem
+      MOCKSERVER_TLS_X509_CERTIFICATE_PATH: /config/ssl/mockserver_cert_chain.pem
+      MOCKSERVER_CERTIFICATE_AUTHORITY_PRIVATE_KEY: /config/ssl/rootCA_private_key_pk8.pem
+      MOCKSERVER_CERTIFICATE_AUTHORITY_X509_CERTIFICATE: /config/ssl/rootCA_cert_chain.pem
+      MOCKSERVER_INITIALIZATION_JSON_PATH: /config/expectations.json
+    volumes:
+      - ./mockserver/expectations.json:/config/expectations.json
+      - ./mockserver/mockserver_private_key_pk8.pem:/config/ssl/mockserver_private_key_pk8.pem
+      - ./mockserver/mockserver_cert_chain.pem:/config/ssl/mockserver_cert_chain.pem
+      - ./mockserver/rootCA_private_key_pk8.pem:/config/ssl/rootCA_private_key_pk8.pem
+      - ./mockserver/rootCA_cert_chain.pem:/config/ssl/rootCA_cert_chain.pem

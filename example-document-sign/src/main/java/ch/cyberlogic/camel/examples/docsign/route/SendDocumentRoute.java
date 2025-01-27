@@ -26,6 +26,7 @@ public class SendDocumentRoute extends RouteBuilder {
                 .to(ExchangePattern.InOut,
                         jms("{{clientSend.clientSendRequestQueue}}")
                                 .replyTo("{{clientSend.clientSendResponseQueue}}")
+                                .requestTimeout(300000)
                 )
                 .log("Received response from ClientSend service, unmarshalling: ${body}")
                 .unmarshal().jacksonXml(ClientSendResponse.class)

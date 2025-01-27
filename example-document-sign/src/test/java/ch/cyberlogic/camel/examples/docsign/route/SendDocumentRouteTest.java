@@ -30,7 +30,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import static ch.cyberlogic.camel.examples.docsign.route.ReadDocumentRoute.DATABASE_LOG_ID;
 import static org.apache.camel.builder.Builder.constant;
-import static org.apache.camel.builder.endpoint.StaticEndpointBuilders.jms;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -95,9 +94,7 @@ public class SendDocumentRouteTest {
                         "where id=:#${headers." + ReadDocumentRoute.DATABASE_LOG_ID + "}",
                 MOCK_SQL);
         advice.replaceEndpoint(
-                jms("{{clientSend.clientSendRequestQueue}}")
-                        .replyTo("{{clientSend.clientSendResponseQueue}}")
-                        .getRawUri(),
+                "jms:*",
                 MOCK_JMS_SEND_SERVICE);
         advice.replaceEndpoint(
                 ErrorHandlingConfiguration.SQL_WRITE_EXCEPTION_ENDPOINT,

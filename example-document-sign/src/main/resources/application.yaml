@@ -19,6 +19,8 @@ sftp:
     known_hosts: "etc/.ssh/known_hosts"
 
 spring:
+  main:
+    web-application-type: none
   datasource:
     url: "jdbc:postgresql://${DOCSEND_DB_URL}/integration"
     driverClassName: org.postgresql.Driver
