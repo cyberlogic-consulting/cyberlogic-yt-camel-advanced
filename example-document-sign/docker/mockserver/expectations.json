@@ -1,0 +1,11 @@
+[
+  {
+    "httpRequest": {
+      "method": "POST",
+      "path": "/SignDocument/sign"
+    },
+    "httpResponse": {
+      "body": "{\"message\":\"Document is signed\",\"signedDocument\":\"Ww0KICB7DQogICAgImh0dHBSZXF1ZXN0Ijogew0KICAgICAgIm1ldGhvZCI6ICJQT1NUIiwNCiAgICAgICJwYXRoIjogIi9TaWduRG9jdW1lbnQvc2lnbiINCiAgICB9LA0KICAgICJodHRwUmVzcG9uc2UiOiB7DQogICAgICAiYm9keSI6ICIiDQogICAgfQ0KICB9DQpd\",\"status\":\"Ok\",\"timestamp\":\"2007-12-03T10:15:30\"}"
+    }
+  }
+]
