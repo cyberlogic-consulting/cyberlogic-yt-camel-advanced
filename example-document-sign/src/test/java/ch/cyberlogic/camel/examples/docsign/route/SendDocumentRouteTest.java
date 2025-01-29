@@ -89,12 +89,11 @@ public class SendDocumentRouteTest {
                 SendDocumentRoute.ROUTE_ID
         );
         advice.replaceFromWith(TEST_START);
-        advice.replaceEndpoint("sql:" +
-                        "update document_sign_log set status=:#${body.getStatus}, last_update=:#${date:now} " +
-                        "where id=:#${headers." + ReadDocumentRoute.DATABASE_LOG_ID + "}",
+        advice.replaceEndpoint(
+                SendDocumentRoute.SQL_LOG_ENDPOINT.getRawUri(),
                 MOCK_SQL);
         advice.replaceEndpoint(
-                "jms:*",
+                SendDocumentRoute.JMS_ENDPOINT.getRawUri(),
                 MOCK_JMS_SEND_SERVICE);
         advice.replaceEndpoint(
                 ErrorHandlingConfiguration.SQL_WRITE_EXCEPTION_ENDPOINT,

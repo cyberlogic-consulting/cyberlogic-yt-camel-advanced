@@ -29,7 +29,6 @@ import org.springframework.test.context.ActiveProfiles;
 
 import static ch.cyberlogic.camel.examples.docsign.route.ReadDocumentRoute.DATABASE_LOG_ID;
 import static org.apache.camel.builder.Builder.constant;
-import static org.apache.camel.builder.endpoint.StaticEndpointBuilders.https;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -89,14 +88,11 @@ public class SignDocumentRouteTest {
                 SignDocumentRoute.ROUTE_ID
         );
         advice.replaceFromWith(TEST_START);
-        advice.replaceEndpoint("sql:" +
-                        "update document_sign_log set status=:#${body.getStatus}, last_update=:#${date:now} " +
-                        "where id=:#${headers." + ReadDocumentRoute.DATABASE_LOG_ID + "}",
+        advice.replaceEndpoint(
+                SignDocumentRoute.SQL_LOG_ENDPOINT.getRawUri(),
                 MOCK_SQL);
-        advice.replaceEndpoint(https("{{signDocument.serviceUrl}}")
-                        .sslContextParameters("customCertificateSslContextParameters")
-                        .skipRequestHeaders(true)
-                        .getRawUri(),
+        advice.replaceEndpoint(
+                SignDocumentRoute.HTTPS_ENDPOINT.getRawUri(),
                 MOCK_HTTP_SIGN_SERVICE);
         advice.replaceEndpoint(
                 SendDocumentRoute.INPUT_ENDPOINT,

@@ -67,9 +67,8 @@ public class ReadDocumentRouteTest {
                 camelContext,
                 ReadDocumentRoute.ROUTE_ID);
         advice.replaceFromWith(DIRECT_START);
-        advice.replaceEndpoint("sql:" +
-                        "insert into document_sign_log (document_number, owner, last_update, status) " +
-                        "values (:#${headerAs(documentId, Integer)}, :#${header.ownerId}, :#${date:now}, 'Read document')",
+        advice.replaceEndpoint(
+                ReadDocumentRoute.SQL_LOG_ENDPOINT.getRawUri(),
                 MOCK_SQL);
         advice.replaceEndpoint(
                 SignDocumentRoute.INPUT_ENDPOINT,
